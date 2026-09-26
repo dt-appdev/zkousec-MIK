@@ -43,12 +43,13 @@
    "seznamOkruhu","vstup","hlaska","panelOkruhy","panelOtazky",
    "panelStat","statSouhrn","statSeznam","statHlaska","statPozn",
    "odkazPredpis","patickaZk","patickaUc","prepinacPoradi","popisUceni",
-   "hlaskaKolo"].forEach(function (id) {
+   "hlaskaKolo","kapObsah","patickaKap","popisKapitol","napovedaKap"].forEach(function (id) {
     el[id] = document.getElementById(id);
   });
   el.app = document.getElementById("app");
   el.dalsi = document.getElementById("btnDalsi");
   el.zpetZk = document.getElementById("btnZpetZk");
+  el.kapDalsi = document.getElementById("btnKapDalsi");
 
   // ---------------------------------------------------------- úložiště
 
@@ -149,6 +150,7 @@
     predchozi = null;
     sestavFrontu();
     if (rezim === "uceni") sestavUcSeznam(aktualni);
+    if (rezim === "kapitoly" && !kapBeh) vykresliKapitoly();
     var vsechnyOkruhy = okruhy();
     var kolik = vsechnyOkruhy.filter(function (k) { return vybrane[k.sekce]; }).length;
     document.getElementById("btnNabidka")
@@ -356,15 +358,22 @@
 
   function nastavRezim(novy) {
     rezim = novy;
-    var uceni = rezim === "uceni";
-    el.patickaZk.classList.toggle("skryte", uceni);
+    var uceni = rezim === "uceni", kapitoly = rezim === "kapitoly";
+    el.patickaZk.classList.toggle("skryte", uceni || kapitoly);
     el.patickaUc.classList.toggle("skryte", !uceni);
+    el.patickaKap.classList.toggle("skryte", !kapitoly);
     el.prepinacPoradi.classList.toggle("skryte", !uceni);
     el.popisUceni.classList.toggle("skryte", !uceni);
+    el.popisKapitol.classList.toggle("skryte", !kapitoly);
     el.app.classList.remove("zodpovezeno");
+    el.app.classList.toggle("rezim-kapitoly", kapitoly);
+    el.app.classList.remove("kap-prehled");
     if (uceni) {
       sestavUcSeznam(null);        // vstup do učení začíná od první otázky
       vykresliUceni();
+    } else if (kapitoly) {
+      kapBeh = null;
+      vykresliKapitoly();
     } else {
       predchozi = null;
       vykresliRysky();
@@ -378,10 +387,401 @@
     });
   }
 
+  // ---------------------------------------------------------- kapitoly
+  //
+  // Kapitola je nejvýš deset po sobě jdoucích otázek jednoho okruhu v pořadí
+  // podle ID, takže příbuzné otázky jdou za sebou. Odpovídá se hned jako ve
+  // zkoušecím módu a po každé odpovědi je vidět správné znění i předpis.
+  // Odpovědi se počítají jen do hry (XP, série, denní cíl, odznaky), statistiky
+  // ani Leitnerovy úrovně se nemění, takže plánovač o kapitolách neví.
+  // Hvězdičky za nejlepší průchod kapitolou leží pod vlastním klíčem.
+
+  var KAP_ULOZISTE = "zkousec-mik-kapitoly-v1";
+  var KAP_VELIKOST = 10;
+  var kapHvezdy = {};       // klíč kapitoly -> { hvezdy, nejlepsi, pocet, pokusu, kdy }
+  var kapBeh = null;        // rozehraná kapitola: { k: kapitola, zaznamy: [], pozice: index }
+
+  function nactiKapitoly() {
+    try {
+      var raw = localStorage.getItem(KAP_ULOZISTE);
+      var d = raw ? JSON.parse(raw) : null;
+      return (d && d.kapitoly && typeof d.kapitoly === "object") ? d.kapitoly : {};
+    } catch (e) { return {}; }
+  }
+
+  function ulozKapitoly() {
+    try {
+      localStorage.setItem(KAP_ULOZISTE, JSON.stringify({ verze: 1, kapitoly: kapHvezdy }));
+    } catch (e) { /* nevadí */ }
+  }
+
+  // sloučení ze zálohy maximem, aby opakovaný import nic nenafukoval
+  function slucKapitoly(cizi) {
+    Object.keys(cizi).forEach(function (k) {
+      var b = cizi[k] || {};
+      var a = kapHvezdy[k] || (kapHvezdy[k] = { hvezdy: 0, nejlepsi: 0, pocet: 0, pokusu: 0, kdy: 0 });
+      ["hvezdy", "nejlepsi", "pocet", "pokusu", "kdy"].forEach(function (p) {
+        a[p] = Math.max(+a[p] || 0, +b[p] || 0);
+      });
+    });
+  }
+
+  // okruh rozdělím na kapitoly co nejpodobnější velikosti (97 otázek = 7×10 + 3×9)
+  function kapitolyOkruhu(sekce) {
+    var ot = vsechny
+      .filter(function (o) { return o.sekce === sekce; })
+      .sort(function (a, b) { return cisloId(a.id) - cisloId(b.id); });
+    var n = ot.length, pocet = Math.ceil(n / KAP_VELIKOST), vysl = [], od = 0;
+    for (var i = 0; i < pocet; i++) {
+      var velikost = Math.floor(n / pocet) + (i < n % pocet ? 1 : 0);
+      var cast = ot.slice(od, od + velikost);
+      od += velikost;
+      var prvni = cast[0].id, posledni = cast[cast.length - 1].id;
+      var rozsah = prvni && posledni
+        ? (prvni === posledni ? prvni : prvni + "–" + posledni) : "";
+      vysl.push({ sekce: sekce, cislo: i + 1, otazky: cast, rozsah: rozsah,
+                  klic: rozsah || sekce + "#" + (i + 1) });
+    }
+    return vysl;
+  }
+
+  function vybraneKapitoly() {
+    return okruhy()
+      .filter(function (k) { return vybrane[k.sekce]; })
+      .map(function (k) { return { sekce: k.sekce, kapitoly: kapitolyOkruhu(k.sekce) }; });
+  }
+
+  function hvezdyZa(spravne, pocet) {
+    var p = pocet ? spravne / pocet : 0;
+    return p >= 0.9 ? 3 : p >= 0.7 ? 2 : p >= 0.5 ? 1 : 0;
+  }
+
+  function hvezdyText(h) {
+    return "★★★".slice(0, h) + "☆☆☆".slice(h);
+  }
+
+  function nazevKapitoly(k) { return "Kapitola " + k.sekce + " " + k.cislo; }
+
+  // kam pokračovat: první neotevřená kapitola, jinak první bez tří hvězd
+  function doporucenaKapitola(ploche) {
+    var i;
+    for (i = 0; i < ploche.length; i++) if (!kapHvezdy[ploche[i].klic]) return ploche[i];
+    for (i = 0; i < ploche.length; i++) if (kapHvezdy[ploche[i].klic].hvezdy < 3) return ploche[i];
+    return null;
+  }
+
+  function tlacitkoKap(text, hlavni, akce) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    if (hlavni) b.className = "hlavni";
+    b.addEventListener("click", akce);
+    return b;
+  }
+
+  function prehledKapitol() {
+    kapBeh = null;
+    aktualni = null;
+    el.app.classList.add("kap-prehled");
+    el.app.classList.remove("zodpovezeno");
+    el.rysky.textContent = "";
+    el.kapObsah.textContent = "";
+    window.scrollTo(0, 0);
+  }
+
+  function vykresliKapitoly() {
+    prehledKapitol();
+    var skupiny = vybraneKapitoly();
+    var ploche = [];
+    skupiny.forEach(function (s) { ploche = ploche.concat(s.kapitoly); });
+
+    var ziskano = 0;
+    ploche.forEach(function (k) { ziskano += (kapHvezdy[k.klic] || {}).hvezdy || 0; });
+    el.skore.innerHTML = "★ <b>" + ziskano + "</b> / " + 3 * ploche.length;
+
+    var uvod = document.createElement("p");
+    uvod.className = "kap-uvod";
+    if (!ploche.length) {
+      uvod.textContent = vsechny.length
+        ? "Není vybraný žádný okruh. Vyber ho tlačítkem ≡ vpravo nahoře."
+        : "Zatím tu nejsou žádné otázky.";
+      el.kapObsah.appendChild(uvod);
+      return;
+    }
+    uvod.textContent = "Odpovídej hned, i když si nejsi jistý. Po každé odpovědi uvidíš "
+      + "správné znění a paragraf. Tři hvězdy za 90 % správně, dvě za 70 %, jedna za 50 %.";
+    el.kapObsah.appendChild(uvod);
+
+    var doporucena = doporucenaKapitola(ploche);
+    if (doporucena) {
+      var dal = document.createElement("button");
+      dal.type = "button";
+      dal.className = "kap-pokracovat";
+      dal.textContent = (kapHvezdy[doporucena.klic] ? "Dotáhnout: " : "Pokračovat: ")
+        + nazevKapitoly(doporucena) + (doporucena.rozsah ? " · " + doporucena.rozsah : "");
+      dal.addEventListener("click", function () { spustKapitolu(doporucena); });
+      el.kapObsah.appendChild(dal);
+    }
+
+    skupiny.forEach(function (s) {
+      var blok = document.createElement("div");
+      blok.className = "kap-okruh";
+
+      var hl = document.createElement("div");
+      hl.className = "kap-hlavicka";
+      var jm = document.createElement("span");
+      jm.className = "kdo";
+      jm.textContent = "Okruh " + s.sekce;
+      if (nazvy[s.sekce]) {
+        var sm = document.createElement("small");
+        sm.textContent = nazvy[s.sekce];
+        jm.appendChild(sm);
+      }
+      var hv = 0;
+      s.kapitoly.forEach(function (k) { hv += (kapHvezdy[k.klic] || {}).hvezdy || 0; });
+      var ci = document.createElement("span");
+      ci.className = "cislo";
+      ci.textContent = "★ " + hv + " / " + 3 * s.kapitoly.length;
+      hl.appendChild(jm); hl.appendChild(ci);
+      blok.appendChild(hl);
+
+      var mriz = document.createElement("div");
+      mriz.className = "kap-mriz";
+      s.kapitoly.forEach(function (k) {
+        var z = kapHvezdy[k.klic];
+        var t = document.createElement("button");
+        t.type = "button";
+        t.className = "kap-dlazdice";
+        if (z) t.classList.add("zacato");
+        if (z && z.hvezdy === 3) t.classList.add("tri");
+        if (k === doporucena) t.classList.add("doporucena");
+        var c = document.createElement("b");
+        c.textContent = k.cislo;
+        var h = document.createElement("span");
+        h.className = "hv";
+        h.textContent = hvezdyText(z ? z.hvezdy : 0);
+        var r = document.createElement("small");
+        r.textContent = k.rozsah;
+        t.appendChild(c); t.appendChild(h); t.appendChild(r);
+        t.title = nazevKapitoly(k) + ", " + k.otazky.length + " otázek"
+          + (z ? ", nejlépe " + z.nejlepsi + " správně" : "");
+        t.addEventListener("click", function () { spustKapitolu(k); });
+        mriz.appendChild(t);
+      });
+      blok.appendChild(mriz);
+      el.kapObsah.appendChild(blok);
+    });
+  }
+
+  function spustKapitolu(k) {
+    kapBeh = {
+      k: k,
+      pozice: 0,
+      zaznamy: k.otazky.map(function (o) {
+        var m = sestavMoznosti(o);
+        return { o: o, moznosti: m, spravnaPoz: m.findIndex(function (x) { return x.spravna; }),
+                 vybrano: null };
+      })
+    };
+    vykresliKapOtazku(true);
+  }
+
+  function vykresliKapOtazku(posunout) {
+    var b = kapBeh, z = b.zaznamy[b.pozice], hotovo = z.vybrano !== null;
+    aktualni = z.o;
+    el.app.classList.remove("kap-prehled");
+    el.app.classList.toggle("zodpovezeno", hotovo);
+
+    el.idcko.textContent = z.o.id || "";
+    var zn = document.createElement("span");
+    zn.className = "prohlizeni";
+    zn.textContent = (z.o.id ? "  ·  " : "") + "kapitola " + b.k.sekce + " " + b.k.cislo;
+    el.idcko.appendChild(zn);
+
+    el.otazka.textContent = z.o.otazka;
+    el.odpovedi.textContent = "";
+    z.moznosti.forEach(function (m, i) {
+      var t = document.createElement("button");
+      t.className = "odpoved";
+      t.type = "button";
+      if (hotovo) {
+        if (i === z.vybrano) t.classList.add(i === z.spravnaPoz ? "vybrana-ano" : "vybrana-ne");
+        else if (i === z.spravnaPoz) t.classList.add("ukazana");
+      }
+      var p = document.createElement("span");
+      p.className = "pismeno";
+      p.textContent = "abc".charAt(i);
+      var x = document.createElement("span");
+      x.className = "text";
+      x.textContent = m.text;
+      t.appendChild(p); t.appendChild(x);
+      t.addEventListener("click", function () { odpovezKap(i); });
+      el.odpovedi.appendChild(t);
+    });
+
+    var sporna = [];
+    if (hotovo) {
+      z.moznosti.forEach(function (m, i) { if (m.sporny) sporna.push("abc".charAt(i)); });
+    }
+    if (sporna.length) {
+      el.sporne.textContent = "Možnost " + sporna.join(" a ")
+        + " jsem si nebyl jistý — ověř si ji v předpisu, než se ji naučíš jako špatnou.";
+    }
+    el.sporne.classList.toggle("skryte", !sporna.length);
+    el.odkazPredpis.textContent = hotovo ? (z.o.odkaz || "") : "";
+    el.odkazPredpis.classList.toggle("skryte", !(hotovo && z.o.odkaz));
+
+    // rysky ukazují průběh kapitoly, šedé jsou otázky, které teprve přijdou
+    el.rysky.textContent = "";
+    var ok = 0;
+    b.zaznamy.forEach(function (zz) {
+      var d = document.createElement("div");
+      d.className = "ryska";
+      if (zz.vybrano !== null) {
+        var t = zz.vybrano === zz.spravnaPoz;
+        if (t) ok++;
+        d.classList.add(t ? "ano" : "ne");
+      }
+      el.rysky.appendChild(d);
+    });
+    el.skore.innerHTML = "<b>" + (b.pozice + 1) + "</b> / " + b.zaznamy.length
+      + "<span class=\"zbyva\"> · správně " + ok + "</span>";
+
+    el.kapDalsi.classList.toggle("skryte", !hotovo);
+    el.napovedaKap.classList.toggle("skryte", hotovo);
+    el.kapDalsi.textContent = b.pozice < b.zaznamy.length - 1 ? "Další otázka" : "Výsledek kapitoly";
+
+    if (posunout) window.scrollTo(0, 0);
+  }
+
+  function odpovezKap(index) {
+    if (!kapBeh) return;
+    var z = kapBeh.zaznamy[kapBeh.pozice];
+    if (z.vybrano !== null) return;
+    z.vybrano = index;
+    var trefa = index === z.spravnaPoz;
+    vykresliKapOtazku(false);
+    el.kapDalsi.focus({ preventScroll: true });
+
+    // jen do hry; úroveň otázky se jen čte, statistika zůstává netknutá
+    var s = statistika[klic(z.o)];
+    var u = urovenOtazky(z.o);
+    hraPoOdpovedi({
+      trefa: trefa, urovenPred: u, urovenPo: u, neCelkem: s ? s.ne || 0 : 0,
+      znovu: false, tlacitko: el.odpovedi.children[index]
+    });
+  }
+
+  function kapitolaDal() {
+    if (!kapBeh) return;
+    if (kapBeh.zaznamy[kapBeh.pozice].vybrano === null) return;
+    if (kapBeh.pozice < kapBeh.zaznamy.length - 1) {
+      kapBeh.pozice++;
+      vykresliKapOtazku(true);
+    } else {
+      dokonciKapitolu();
+    }
+  }
+
+  function dokonciKapitolu() {
+    var b = kapBeh, k = b.k, n = b.zaznamy.length;
+    var chyby = b.zaznamy.filter(function (z) { return z.vybrano !== z.spravnaPoz; });
+    var spravne = n - chyby.length, h = hvezdyZa(spravne, n);
+
+    var pred = kapHvezdy[k.klic];
+    var predHvezdy = pred ? pred.hvezdy : 0;
+    var zapis = pred || { hvezdy: 0, nejlepsi: 0, pocet: n, pokusu: 0, kdy: 0 };
+    zapis.hvezdy = Math.max(zapis.hvezdy, h);
+    zapis.nejlepsi = Math.max(zapis.nejlepsi, spravne);
+    zapis.pocet = n;
+    zapis.pokusu++;
+    zapis.kdy = Date.now();
+    kapHvezdy[k.klic] = zapis;
+    ulozKapitoly();
+
+    prehledKapitol();
+    el.skore.innerHTML = "<b>" + spravne + "</b> / " + n;
+
+    var hl = document.createElement("div");
+    hl.className = "kap-vysledek";
+    var nad = document.createElement("h2");
+    nad.textContent = nazevKapitoly(k);
+    var roz = document.createElement("small");
+    roz.textContent = k.rozsah + (nazvy[k.sekce] ? " · " + nazvy[k.sekce] : "");
+    nad.appendChild(roz);
+    var hv = document.createElement("div");
+    hv.className = "kap-hvezdy";
+    for (var i = 0; i < 3; i++) {
+      var s = document.createElement("span");
+      s.textContent = i < h ? "★" : "☆";
+      if (i < h) s.className = "sviti";
+      hv.appendChild(s);
+    }
+    var sk = document.createElement("div");
+    sk.className = "kap-skore";
+    sk.innerHTML = "<b>" + spravne + "</b> z " + n + " správně";
+    var poz = document.createElement("p");
+    var natri = Math.ceil(0.9 * n - 1e-9);
+    poz.textContent = h === 3
+      ? (predHvezdy < 3 ? "Kapitola je na tři hvězdy." : "Pořád na tři hvězdy. Drží to.")
+      : (h > predHvezdy && pred ? "Zlepšení oproti minule. " : "")
+        + "Na tři hvězdy potřebuješ aspoň " + natri + " z " + n + " správně."
+        + (pred && predHvezdy > h ? " Nejlepší výsledek zůstává " + hvezdyText(predHvezdy) + "." : "");
+    hl.appendChild(nad); hl.appendChild(hv); hl.appendChild(sk); hl.appendChild(poz);
+    el.kapObsah.appendChild(hl);
+
+    if (chyby.length) {
+      var sez = document.createElement("div");
+      sez.className = "seznam kap-chyby";
+      var t = document.createElement("div");
+      t.className = "radek";
+      t.innerHTML = "<span class=\"kdo\"><b>Kde to ujelo</b></span>";
+      sez.appendChild(t);
+      chyby.forEach(function (z) {
+        var r = document.createElement("div");
+        r.className = "radek";
+        var kdo = document.createElement("span");
+        kdo.className = "kdo";
+        var id = document.createElement("b");
+        id.textContent = (z.o.id ? z.o.id + "  " : "");
+        kdo.appendChild(id);
+        kdo.appendChild(document.createTextNode(z.o.otazka));
+        var spr = document.createElement("small");
+        spr.className = "kap-spravna";
+        spr.textContent = "✓ " + z.o.spravna;
+        kdo.appendChild(spr);
+        r.appendChild(kdo);
+        sez.appendChild(r);
+      });
+      el.kapObsah.appendChild(sez);
+    }
+
+    var ploche = [];
+    vybraneKapitoly().forEach(function (s) { ploche = ploche.concat(s.kapitoly); });
+    var idx = -1;
+    ploche.forEach(function (x, i) { if (x.klic === k.klic) idx = i; });
+    var dalsi = idx >= 0 ? ploche[idx + 1] : null;
+
+    var tl = document.createElement("div");
+    tl.className = "tlacitka";
+    tl.appendChild(tlacitkoKap("Zopakovat", !dalsi || h < 2, function () { spustKapitolu(k); }));
+    if (dalsi) {
+      tl.appendChild(tlacitkoKap("Další kapitola", h >= 2, function () { spustKapitolu(dalsi); }));
+    }
+    el.kapObsah.appendChild(tl);
+    var od = document.createElement("div");
+    od.className = "odkaz";
+    od.appendChild(tlacitkoKap("Všechny kapitoly", false, vykresliKapitoly));
+    el.kapObsah.appendChild(od);
+
+    if (h === 3) { zvuk("fanfara"); konfetyVelke(); vibruj([40, 60, 40, 60, 120]); }
+    else if (h > predHvezdy) zvuk("milnik");
+  }
+
   // ---------------------------------------------------------- vykreslení
 
   function vykresliRysky() {
-    if (rezim === "uceni") return;
+    if (rezim !== "zkouseni") return;
     var vzorek = prubeh.slice(-MAX_RYSEK);
     el.rysky.textContent = "";
     for (var i = 0; i < vzorek.length; i++) {
@@ -725,7 +1125,8 @@
   function exportujStatistiku() {
     try {
       var blob = new Blob(
-        [JSON.stringify({ verze: 2, ulozeno: Date.now(), statistika: statistika, hra: hra }, null, 1)],
+        [JSON.stringify({ verze: 2, ulozeno: Date.now(), statistika: statistika, hra: hra,
+                         kapitoly: kapHvezdy }, null, 1)],
         { type: "application/json" });
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -763,6 +1164,7 @@
         else hra.xp = Math.max(hra.xp, semeno());
         zkontrolujOdznaky(kontext(), true);
         ulozHru();
+        if (d.kapitoly && typeof d.kapitoly === "object") { slucKapitoly(d.kapitoly); ulozKapitoly(); }
         vykresliListu();
         vykresliStatistiky();
         el.statHlaska.textContent = "Přičteno " + pridano + " záznamů"
@@ -793,6 +1195,8 @@
     zobraz(null);
     if (rezim === "uceni") {
       vykresliUceni();
+    } else if (rezim === "kapitoly") {
+      if (!kapBeh) vykresliKapitoly();
     } else if (!aktualni || aktivni.indexOf(aktualni) < 0) {
       dalsiOtazka();
     }
@@ -821,6 +1225,7 @@
     zobraz(null);
     vykresliRysky();
     if (rezim === "uceni") { sestavUcSeznam(null); vykresliUceni(); }
+    else if (rezim === "kapitoly") { kapBeh = null; vykresliKapitoly(); }
     else dalsiOtazka();
   }
 
@@ -1607,6 +2012,12 @@
   document.getElementById("btnDalsiUc").addEventListener("click", function () { posunUceni(1); });
   document.getElementById("btnPredchozi").addEventListener("click", function () { posunUceni(-1); });
 
+  el.kapDalsi.addEventListener("click", kapitolaDal);
+  document.getElementById("btnKapZpet").addEventListener("click", function () {
+    kapBeh = null;
+    vykresliKapitoly();
+  });
+
   document.getElementById("prepinacRezim").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
@@ -1639,12 +2050,14 @@
     e.target.value = "";
   });
   document.getElementById("btnStatReset").addEventListener("click", function () {
-    if (!window.confirm("Opravdu vynulovat všechny statistiky včetně bodů, úrovně a odznaků? Nejde to vzít zpět.")) return;
+    if (!window.confirm("Opravdu vynulovat všechny statistiky včetně bodů, úrovně, odznaků a hvězdiček z kapitol? Nejde to vzít zpět.")) return;
     var nastaveniHry = hra.nastaveni;
     hra = novaHra(); hra.nastaveni = nastaveniHry; serie = 0; ulozHru(); vykresliListu();
     statistika = {}; prubeh = []; spravne = celkem = 0;
     historie = []; pozice = -1; aktualni = null;
     sezeni = {}; relaps = {}; kolo = 1; sestavFrontu();
+    kapHvezdy = {}; kapBeh = null; ulozKapitoly();
+    if (rezim === "kapitoly") vykresliKapitoly();
     ulozUlozene(); vykresliRysky(); vykresliStatistiky();
   });
 
@@ -1654,6 +2067,19 @@
       return;
     }
     var k = e.key.toLowerCase();
+
+    if (rezim === "kapitoly") {
+      if (!kapBeh) return;
+      var zk = kapBeh.zaznamy[kapBeh.pozice];
+      if (zk.vybrano === null) {
+        var ik = "abc".indexOf(k);
+        if (ik < 0) ik = "123".indexOf(k);
+        if (ik >= 0 && ik < zk.moznosti.length) { e.preventDefault(); odpovezKap(ik); }
+      } else if (k === "enter" || k === " " || k === "arrowright") {
+        e.preventDefault(); kapitolaDal();
+      }
+      return;
+    }
 
     if (rezim === "uceni") {
       if (k === "arrowright" || k === "enter" || k === " ") { e.preventDefault(); posunUceni(1); }
@@ -1687,6 +2113,7 @@
   }
 
   statistika = nactiUlozene();
+  kapHvezdy = nactiKapitoly();
   oznacPrepinac(document.getElementById("prepinacRezim"), "data-rezim", "zkouseni");
   oznacPrepinac(document.getElementById("prepinacPoradi"), "data-poradi", "id");
   nastavOvladaniHry();
