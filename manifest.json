@@ -1,0 +1,18 @@
+{
+  "name": "Zkoušeč MIK",
+  "short_name": "Zkoušeč MIK",
+  "description": "Trenažér písemného testu autorizační zkoušky ČKAIT, obor mosty a inženýrské konstrukce",
+  "lang": "cs",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#131a21",
+  "theme_color": "#16212b",
+  "icons": [
+    { "src": "ikony/ikona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ikony/ikona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ikony/ikona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
