@@ -885,6 +885,7 @@ body { overscroll-behavior: none; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+  .pomodoro.pulz,
   .serie.pulz, .odpoved.pop, .odpoved.tres, .toast, .toast.pryc { animation: none; }
   .plovouci-xp { animation-duration: .01s; }
 }
@@ -993,3 +994,69 @@ body { overscroll-behavior: none; }
 .seznam.kap-chyby { flex: none; overflow: visible; }
 .kap-chyby .kdo b { color: var(--chyba); }
 .kap-chyby .kap-spravna { margin-top: 4px; color: var(--spravne) !important; line-height: 1.35; }
+
+/* ---------- pomodoro ---------- */
+
+:root { --rajce: #c8412f; }
+@media (prefers-color-scheme: dark) { :root { --rajce: #f07a63; } }
+
+.pomodoro {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid var(--linka);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--tlumene);
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.pomodoro.bezi  { color: var(--rajce); border-color: var(--rajce); }
+.pomodoro.pauza { color: var(--spravne); border-color: var(--spravne); background: var(--spravne-bg); }
+.pomodoro.pulz  { animation: pulz .6s ease 3; }
+
+.pom-hodiny {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  text-align: center;
+}
+.pom-faze {
+  color: var(--tlumene);
+  font-size: .95rem;
+  font-weight: 600;
+}
+.pom-cas {
+  font-size: clamp(4rem, 22vw, 7rem);
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.pom-hodiny.bezi .pom-cas  { color: var(--rajce); }
+.pom-hodiny.pauza .pom-cas { color: var(--spravne); }
+.pom-tecky { display: flex; gap: 10px; }
+.pom-tecky span {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--linka);
+  border-radius: 50%;
+}
+.pom-tecky span.plna { border-color: var(--rajce); background: var(--rajce); }
+.pom-tecky span.tato { border-color: var(--rajce); }
+.pom-rada {
+  max-width: 420px;
+  color: var(--tlumene);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+.tlacitka button:disabled { opacity: .4; cursor: default; }

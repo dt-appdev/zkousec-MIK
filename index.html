@@ -43,6 +43,7 @@
       <div class="xp-lista"><div id="xpLista"></div></div>
     </div>
     <div class="serie" id="serie" title="Správně v řadě">🔥 0</div>
+    <button type="button" class="pomodoro" id="pomodoro" aria-label="Pomodoro časovač">🍅 25:00</button>
   </div>
 
   <div class="kolo skryte" id="hlaskaKolo"></div>
@@ -109,6 +110,14 @@
         <option value="150">150</option>
       </select> denně
     </label>
+    <label class="cip">🍅 Pomodoro
+      <select id="volbaPomodoro">
+        <option value="25">25 + 5 min</option>
+        <option value="50">50 + 10 min</option>
+        <option value="15">15 + 3 min</option>
+        <option value="0">vypnuto</option>
+      </select>
+    </label>
   </div>
   <p id="souhrn"></p>
   <div class="seznam" id="seznamOkruhu"></div>
@@ -154,6 +163,25 @@
     <button id="btnZpet">Zpět</button>
     <button id="btnNacist" class="hlavni">Načíst otázky</button>
   </div>
+</div>
+
+<!-- panel: pomodoro -->
+<div class="prekryv skryte" id="panelPomodoro">
+  <h2>Pomodoro</h2>
+  <p>Soustředěný blok práce a po něm krátká pauza, po čtyřech blocích delší.
+     Časovač běží stejně ve zkoušení, v kapitolách i v učení.</p>
+  <div class="pom-hodiny" id="pomHodiny">
+    <div class="pom-faze" id="pomFaze"></div>
+    <div class="pom-cas" id="pomCas">25:00</div>
+    <div class="pom-tecky" id="pomTecky"></div>
+    <div class="pom-rada" id="pomRada"></div>
+  </div>
+  <div class="tlacitka">
+    <button id="btnPomReset">Vynulovat</button>
+    <button id="btnPomPreskocit">Přeskočit</button>
+    <button id="btnPomStart" class="hlavni">Start</button>
+  </div>
+  <div class="odkaz"><button id="btnPomZavrit">Zpět k otázkám</button></div>
 </div>
 
 <canvas id="konfety" aria-hidden="true"></canvas>
