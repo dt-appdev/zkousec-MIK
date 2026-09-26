@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f4f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131a21" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Trenažér písemného testu autorizační zkoušky ČKAIT, obor mosty a inženýrské konstrukce">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zkoušeč MIK">
+<title>Zkoušeč MIK</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="ikony/ikona-192.png">
+<link rel="apple-touch-icon" href="ikony/ikona-180.png">
+<link rel="stylesheet" href="css/styl.css">
+</head>
+
+<body>
+
+<div class="app" id="app">
+  <div class="hlavicka">
+    <div class="rysky" id="rysky"></div>
+    <div class="skore" id="skore"><b>0</b> / 0</div>
+    <button class="nabidka" id="btnNabidka" aria-label="Okruhy a otázky">≡</button>
+  </div>
+
+  <div class="hra-lista" id="hraLista">
+    <div class="cil-kruh" id="cilKruh" title="Dnešní cíl">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <circle class="podklad" cx="17" cy="17" r="14" fill="none" stroke-width="4"></circle>
+        <circle class="postup" id="cilPostup" cx="17" cy="17" r="14" fill="none" stroke-width="4"
+                stroke-linecap="round" stroke-dasharray="87.96" stroke-dashoffset="87.96"></circle>
+      </svg>
+      <div class="cislo" id="cilCislo">0</div>
+    </div>
+    <div class="uroven">
+      <div class="radek-urovne">
+        <span id="urovenIkona"></span>
+        <span class="jmeno-urovne" id="urovenJmeno"></span>
+        <span class="xp-text" id="xpText"></span>
+      </div>
+      <div class="xp-lista"><div id="xpLista"></div></div>
+    </div>
+    <div class="serie" id="serie" title="Správně v řadě">🔥 0</div>
+  </div>
+
+  <div class="kolo skryte" id="hlaskaKolo"></div>
+
+  <div>
+    <div class="idcko" id="idcko"></div>
+  </div>
+  <div class="otazka" id="otazka"></div>
+
+  <div class="odpovedi" id="odpovedi"></div>
+  <div class="odkaz-predpis skryte" id="odkazPredpis"></div>
+  <div class="sporne skryte" id="sporne"></div>
+
+  <div class="paticka" id="patickaZk">
+    <button class="zpet" id="btnZpetZk" aria-label="Předchozí otázka" disabled>&#8592;</button>
+    <button class="dalsi skryte" id="btnDalsi">Další otázka</button>
+    <div class="napoveda" id="napoveda">Vyber jednu z možností</div>
+  </div>
+
+  <div class="paticka skryte" id="patickaUc">
+    <button class="zpet" id="btnPredchozi" aria-label="Předchozí otázka">&#8592;</button>
+    <button class="dalsi" id="btnDalsiUc">Další</button>
+  </div>
+</div>
+
+<!-- panel: výběr okruhů -->
+<div class="prekryv skryte" id="panelOkruhy">
+  <h2>Okruhy</h2>
+  <div class="prepinac" id="prepinacRezim">
+    <button type="button" data-rezim="zkouseni">Zkoušení</button>
+    <button type="button" data-rezim="uceni">Učení</button>
+  </div>
+  <div class="prepinac skryte" id="prepinacPoradi">
+    <button type="button" data-poradi="id">Podle ID</button>
+    <button type="button" data-poradi="nahodne">Náhodně</button>
+  </div>
+  <div class="prepinac-popis skryte" id="popisUceni">
+    V učícím módu se nezkouší, jen listuješ otázkami se správnou odpovědí a odkazem na předpis.
+  </div>
+  <div class="odpocet" id="odpocet"></div>
+  <div class="nastaveni">
+    <button type="button" class="cip" id="cipZvuk" aria-pressed="true">🔊 Zvuk</button>
+    <button type="button" class="cip" id="cipVibrace" aria-pressed="true">📳 Vibrace</button>
+    <label class="cip">🎯 Cíl
+      <select id="volbaCil">
+        <option value="20">20</option>
+        <option value="30">30</option>
+        <option value="40">40</option>
+        <option value="60">60</option>
+        <option value="80">80</option>
+        <option value="100">100</option>
+        <option value="150">150</option>
+      </select> denně
+    </label>
+  </div>
+  <p id="souhrn"></p>
+  <div class="seznam" id="seznamOkruhu"></div>
+  <div class="tlacitka">
+    <button id="btnVse">Vybrat vše</button>
+    <button id="btnZadny">Zrušit vše</button>
+    <button id="btnHotovo" class="hlavni">Hotovo</button>
+  </div>
+  <div class="odkaz">
+    <button id="btnKStatistice">Statistiky</button>
+    <button id="btnKOtazkam">Upravit otázky</button>
+  </div>
+</div>
+
+<!-- panel: statistiky -->
+<div class="prekryv skryte" id="panelStat">
+  <h2>Statistiky</h2>
+  <p id="statSouhrn"></p>
+  <div class="pozn skryte" id="statPozn"></div>
+  <div class="posuv">
+    <div id="hraPrehled"></div>
+    <div class="seznam" id="statSeznam"></div>
+  </div>
+  <div class="hlaska" id="statHlaska"></div>
+  <div class="tlacitka">
+    <button id="btnStatZpet">Zpět</button>
+    <button id="btnStatExport">Uložit zálohu</button>
+    <button id="btnStatImport">Načíst zálohu</button>
+  </div>
+  <div class="odkaz"><button id="btnStatReset">Vynulovat statistiky</button></div>
+  <input type="file" id="statSoubor" accept="application/json,.json" class="skryte">
+</div>
+
+<!-- panel: úprava otázek -->
+<div class="prekryv skryte" id="panelOtazky">
+  <h2>Otázky</h2>
+  <p>Řádek <b>?</b> otázka, <b>+</b> správná odpověď, <b>-</b> špatná odpověď,
+     <b>-!</b> špatná odpověď k ověření, <b>@ I = název</b> pojmenuje okruh.
+     Změna platí do zavření aplikace. Trvale se otázky upravují v souboru otazky_data.txt v repozitáři.</p>
+  <textarea id="vstup" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+  <div class="hlaska" id="hlaska"></div>
+  <div class="tlacitka">
+    <button id="btnZpet">Zpět</button>
+    <button id="btnNacist" class="hlavni">Načíst otázky</button>
+  </div>
+</div>
+
+<canvas id="konfety" aria-hidden="true"></canvas>
+<div class="toasty" id="toasty" aria-live="polite"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
