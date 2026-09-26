@@ -46,6 +46,7 @@
   </div>
 
   <div class="kolo skryte" id="hlaskaKolo"></div>
+  <div class="kap-obsah" id="kapObsah"></div>
 
   <div>
     <div class="idcko" id="idcko"></div>
@@ -66,6 +67,12 @@
     <button class="zpet" id="btnPredchozi" aria-label="Předchozí otázka">&#8592;</button>
     <button class="dalsi" id="btnDalsiUc">Další</button>
   </div>
+
+  <div class="paticka skryte" id="patickaKap">
+    <button class="zpet" id="btnKapZpet" aria-label="Zpět na přehled kapitol">&#8592;</button>
+    <button class="dalsi skryte" id="btnKapDalsi">Další otázka</button>
+    <div class="napoveda" id="napovedaKap">Vyber jednu z možností</div>
+  </div>
 </div>
 
 <!-- panel: výběr okruhů -->
@@ -73,6 +80,7 @@
   <h2>Okruhy</h2>
   <div class="prepinac" id="prepinacRezim">
     <button type="button" data-rezim="zkouseni">Zkoušení</button>
+    <button type="button" data-rezim="kapitoly">Kapitoly</button>
     <button type="button" data-rezim="uceni">Učení</button>
   </div>
   <div class="prepinac skryte" id="prepinacPoradi">
@@ -81,6 +89,10 @@
   </div>
   <div class="prepinac-popis skryte" id="popisUceni">
     V učícím módu se nezkouší, jen listuješ otázkami se správnou odpovědí a odkazem na předpis.
+  </div>
+  <div class="prepinac-popis skryte" id="popisKapitol">
+    Kapitola je deset příbuzných otázek po sobě v pořadí podle ID. Odpovědi se počítají
+    do bodů, série a denního cíle, statistiky a plánovač se nemění.
   </div>
   <div class="odpocet" id="odpocet"></div>
   <div class="nastaveni">

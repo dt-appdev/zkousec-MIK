@@ -10,7 +10,8 @@ Běží jako PWA z GitHub Pages: dá se nainstalovat na plochu tabletu a funguje
 
 Zkoušecí mód s Leitnerovým plánovačem opakování (úrovně 0 až 5, chybné otázky se
 v sezení jednou vrátí), historie sezení s listováním zpět, učící mód se správnými
-odpověďmi a odkazy na předpisy, filtr okruhů, statistiky se zálohou do souboru.
+odpověďmi a odkazy na předpisy, kapitoly (deset příbuzných otázek po sobě s hodnocením
+hvězdičkami), filtr okruhů, statistiky se zálohou do souboru.
 Navíc gamifikace: XP a úrovně, série správných odpovědí, denní cíl, odznaky,
 mapa zvládnutí okruhů, odpočet do zkoušky, zvuky, vibrace a konfety.
 
@@ -46,5 +47,5 @@ Když přidáš nový soubor, který má fungovat offline, připiš ho do seznam
 ## Data na zařízení
 
 Statistiky a herní postup se ukládají jen v prohlížeči zařízení (localStorage,
-klíče `zkousec-mik-v1` a `zkousec-mik-hra-v1`). V repozitáři nic osobního není.
+klíče `zkousec-mik-v1`, `zkousec-mik-hra-v1` a `zkousec-mik-kapitoly-v1`). V repozitáři nic osobního není.
 Přenos mezi zařízeními: Statistiky → Uložit zálohu, na druhém zařízení Načíst zálohu.

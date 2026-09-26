@@ -888,3 +888,108 @@ body { overscroll-behavior: none; }
   .serie.pulz, .odpoved.pop, .odpoved.tres, .toast, .toast.pryc { animation: none; }
   .plovouci-xp { animation-duration: .01s; }
 }
+
+/* ---------- kapitoly ---------- */
+
+.kap-obsah { display: none; }
+.app.kap-prehled .kap-obsah { display: block; flex: 1; padding-bottom: 24px; }
+.app.kap-prehled .idcko,
+.app.kap-prehled .otazka,
+.app.kap-prehled .odpovedi,
+.app.kap-prehled .odkaz-predpis,
+.app.kap-prehled .sporne,
+.app.kap-prehled .paticka { display: none !important; }
+.app.rezim-kapitoly .kolo { display: none !important; }
+
+.kap-uvod {
+  margin: 0 0 12px;
+  color: var(--tlumene);
+  font-size: .88rem;
+  line-height: 1.5;
+}
+
+.kap-pokracovat {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 15px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--inkoust);
+  color: var(--papir);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.kap-okruh {
+  margin-bottom: 12px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--linka);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.kap-hlavicka {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: .96rem;
+}
+.kap-hlavicka .kdo { flex: 1; font-weight: 600; }
+.kap-hlavicka .kdo small { display: block; color: var(--tlumene); font-size: .8rem; font-weight: 400; }
+.kap-hlavicka .cislo {
+  color: var(--zlato);
+  font-size: .86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kap-mriz {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+}
+.kap-dlazdice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 7px;
+  border: 1px solid var(--linka);
+  border-radius: 6px;
+  background: var(--papir);
+  color: var(--inkoust);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.kap-dlazdice b { font-size: 1.15rem; line-height: 1.1; }
+.kap-dlazdice .hv { color: var(--linka); font-size: .92rem; letter-spacing: 1px; }
+.kap-dlazdice small { color: var(--tlumene); font-size: .66rem; white-space: nowrap; }
+.kap-dlazdice.zacato .hv { color: var(--zlato); }
+.kap-dlazdice.tri { background: var(--zlato-bg); border-color: var(--zlato); }
+.kap-dlazdice.doporucena { outline: 2px solid var(--znak); outline-offset: 1px; }
+
+.kap-vysledek { padding: 8px 0 16px; text-align: center; }
+.kap-vysledek h2 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 600; }
+.kap-vysledek h2 small {
+  display: block;
+  margin-top: 2px;
+  color: var(--tlumene);
+  font-size: .8rem;
+  font-weight: 400;
+}
+.kap-hvezdy { font-size: 3rem; line-height: 1.1; color: var(--linka); letter-spacing: 6px; }
+.kap-hvezdy .sviti { color: var(--zlato); }
+.kap-skore { margin: 4px 0 8px; font-size: 1.05rem; color: var(--tlumene); }
+.kap-skore b { color: var(--inkoust); font-size: 1.3rem; }
+.kap-vysledek p { margin: 0; color: var(--tlumene); font-size: .88rem; line-height: 1.5; }
+
+.seznam.kap-chyby { flex: none; overflow: visible; }
+.kap-chyby .kdo b { color: var(--chyba); }
+.kap-chyby .kap-spravna { margin-top: 4px; color: var(--spravne) !important; line-height: 1.35; }

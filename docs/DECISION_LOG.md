@@ -220,6 +220,32 @@ obsahuje i hru; při importu se hra slučuje maximem, ne součtem, aby opakovan�
 načtení stejné zálohy body nenafouklo. Vynulování statistik nuluje i hru,
 nastavení zůstává. Respektuje `prefers-reduced-motion`.
 
+## Kapitoly (26. 9. 2026)
+
+Učící mód se ukázal jako nejméně oblíbená část. Kartičky se sebehodnocením
+(styl Anki) Tom zkoušel a u dlouhých legislativních odpovědí mu nesedí, proto se
+nezavedly. Místo toho vznikl třetí režim Kapitoly vedle Zkoušení a Učení; učící
+ani zkoušecí mód se nezměnily.
+
+Každý okruh se v pořadí podle ID rozdělí na kapitoly co nejpodobnější velikosti
+s nejvýš deseti otázkami (A má deset kapitol, celkem je jich 54). V kapitole se
+odpovídá jako ve zkoušení a po každé odpovědi je vidět správné znění, předpis
+a případné varování u sporné možnosti. Na konci jsou hvězdičky za podíl správných
+odpovědí (tři za 90 %, dvě za 70 %, jedna za 50 %), přehled chybných otázek se
+správnou odpovědí a tlačítka na zopakování nebo další kapitolu. Přehled kapitol
+nabízí pokračování první neotevřenou kapitolou, potom první bez tří hvězd.
+
+Odpovědi v kapitolách se počítají jen do hry přes `hraPoOdpovedi` (XP, série,
+denní cíl, odznaky). Statistiky ani Leitnerovy úrovně se nemění, takže plánovač
+zkoušecího módu zůstává přesně jako dřív; úroveň otázky se pro výpočet XP jen čte.
+Protože se úroveň nemění, bonus „Zvládnuto!“ ani odznak za otázku vytaženou
+z chyb se v kapitolách získat nedá.
+
+Hvězdičky leží pod novým klíčem `zkousec-mik-kapitoly-v1`, klíčované rozsahem
+ID kapitoly (např. „A1–A10“). Export zálohy je obsahuje v poli `kapitoly`, import
+je slučuje maximem; starší zálohy bez něj se načtou jako dřív. Vynulování statistik
+maže i hvězdičky.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných
