@@ -1183,12 +1183,14 @@
     el.panelOkruhy.classList.toggle("skryte", panel !== "okruhy");
     el.panelOtazky.classList.toggle("skryte", panel !== "otazky");
     el.panelStat.classList.toggle("skryte", panel !== "statistiky");
+    el.panelPomodoro.classList.toggle("skryte", panel !== "pomodoro");
   }
 
   function panelOtevreny() {
     return !el.panelOkruhy.classList.contains("skryte")
         || !el.panelOtazky.classList.contains("skryte")
-        || !el.panelStat.classList.contains("skryte");
+        || !el.panelStat.classList.contains("skryte")
+        || !el.panelPomodoro.classList.contains("skryte");
   }
 
   function zavri() {
@@ -1539,6 +1541,12 @@
         ton(1047, t + 0.38, 0.6, "triangle", 0.12);
       } else if (druh === "odznak") {
         [880, 1175, 1397, 1760, 2349].forEach(function (f, i) { ton(f, t + i * 0.06, 0.28, "sine", 0.1); });
+      } else if (druh === "gong") {
+        // konec bloku: tři klidné údery, sestupně
+        [1175, 988, 784].forEach(function (f, i) { ton(f, t + i * 0.45, 1.1, "sine", 0.16); });
+      } else if (druh === "budicek") {
+        // konec pauzy: krátce a vzestupně, ať je jasné, že se jde zpátky do práce
+        [587, 784, 988, 1175].forEach(function (f, i) { ton(f, t + i * 0.12, 0.3, "triangle", 0.13); });
       }
     } catch (e) { /* zvuk není podstatný */ }
   }
@@ -1981,6 +1989,239 @@
     });
   }
 
+  // ---------------------------------------------------------- pomodoro
+  //
+  // Časovač soustředění sdílený všemi režimy. Blok práce, krátká pauza a po
+  // čtyřech blocích dlouhá pauza. Čas se počítá z okamžiku konce (Date.now()),
+  // ne z počtu tiků, protože Android v uspané aplikaci časovače zastavuje.
+  // Po návratu do aplikace se tak dopočítá, co mezitím uběhlo. Na plánovač,
+  // statistiky ani hru časovač nemá vliv, stav leží pod vlastním klíčem.
+
+  var POM_ULOZISTE = "zkousec-mik-pomodoro-v1";
+  var MINUTA = 60000;
+  var POM_DO_DLOUHE = 4;                        // po kolika blocích přijde dlouhá pauza
+  var POM_DELKY = {                             // klíč je délka bloku v minutách
+    25: { prace: 25, pauza: 5,  dlouha: 15 },   // výchozí, klasické pomodoro
+    50: { prace: 50, pauza: 10, dlouha: 30 },
+    15: { prace: 15, pauza: 3,  dlouha: 10 }
+  };
+
+  var pom = novePom();
+
+  ["pomodoro","panelPomodoro","pomHodiny","pomFaze","pomCas","pomTecky","pomRada",
+   "volbaPomodoro"].forEach(function (id) {
+    el[id] = document.getElementById(id);
+  });
+  el.pomStart = document.getElementById("btnPomStart");
+
+  function novePom() {
+    // faze: "prace" | "pauza" | "dlouha"; hotovo = bloky v rozběhnutém cyklu
+    return { verze: 1, delka: 25, faze: "prace", bezi: false, konec: 0,
+             zbyva: 25 * MINUTA, hotovo: 0, den: "", dnes: 0 };
+  }
+
+  function nactiPom() {
+    var p = novePom();
+    try {
+      var d = JSON.parse(localStorage.getItem(POM_ULOZISTE) || "null");
+      if (!d || typeof d !== "object") return p;
+      if (d.delka === 0 || POM_DELKY[d.delka]) p.delka = d.delka;
+      if (d.faze === "pauza" || d.faze === "dlouha") p.faze = d.faze;
+      p.bezi = d.bezi === true && +d.konec > 0;
+      p.konec = +d.konec || 0;
+      p.zbyva = +d.zbyva > 0 ? +d.zbyva : delkaFaze(p);
+      p.hotovo = Math.min(POM_DO_DLOUHE - 1, Math.max(0, +d.hotovo || 0));
+      if (typeof d.den === "string") { p.den = d.den; p.dnes = +d.dnes || 0; }
+    } catch (e) { /* začne se nanovo */ }
+    return p;
+  }
+
+  function ulozPom() {
+    try { localStorage.setItem(POM_ULOZISTE, JSON.stringify(pom)); } catch (e) { /* nevadí */ }
+  }
+
+  function delkaFaze(p) {
+    var d = POM_DELKY[p.delka] || POM_DELKY[25];
+    return d[p.faze] * MINUTA;
+  }
+
+  function pomZbyva() {
+    return pom.bezi ? Math.max(0, pom.konec - Date.now()) : pom.zbyva;
+  }
+
+  function pomDnes() {
+    return pom.den === denKlic(new Date()) ? pom.dnes : 0;
+  }
+
+  function mmss(ms) {
+    var s = Math.ceil(ms / 1000);
+    return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+
+  function pomFaze(faze, od, spustit) {
+    pom.faze = faze;
+    pom.zbyva = delkaFaze(pom);
+    pom.bezi = spustit;
+    pom.konec = spustit ? od + pom.zbyva : 0;
+  }
+
+  function pomSpust() {
+    if (pom.bezi) return;
+    pom.bezi = true;
+    pom.konec = Date.now() + pom.zbyva;
+  }
+
+  function pomPozastav() {
+    if (!pom.bezi) return;
+    pom.zbyva = pomZbyva();
+    pom.bezi = false;
+    pom.konec = 0;
+  }
+
+  // Konec fáze v čase kdy. Po bloku práce se pauza rozběhne sama, po pauze
+  // časovač počká, až se k tabletu vrátíš a klepneš na Start.
+  function pomDalsiFaze(kdy, dokoncen) {
+    if (pom.faze === "prace") {
+      if (dokoncen) {
+        var k = denKlic(new Date(kdy));
+        if (pom.den !== k) { pom.den = k; pom.dnes = 0; }
+        pom.dnes++;
+      }
+      pom.hotovo++;
+      if (pom.hotovo >= POM_DO_DLOUHE) { pom.hotovo = 0; pomFaze("dlouha", kdy, true); }
+      else pomFaze("pauza", kdy, true);
+    } else {
+      pomFaze("prace", kdy, false);
+    }
+  }
+
+  function pomTik() {
+    if (!pom.delka) return;
+    var skoncila = null;
+    // cyklus kvůli návratu z pozadí: mohl mezitím skončit blok i pauza po něm
+    while (pom.bezi && Date.now() >= pom.konec) {
+      skoncila = pom.faze;
+      pomDalsiFaze(pom.konec, true);
+    }
+    if (skoncila) {
+      ulozPom();
+      pomOznam(skoncila);
+    }
+    vykresliPom();
+  }
+
+  function pomOznam(skoncila) {
+    var jinyPanel = panelOtevreny() && el.panelPomodoro.classList.contains("skryte");
+    if (pom.faze !== "prace") {
+      zvuk("gong");
+      vibruj([300, 150, 300]);
+      // panel s pauzou se otevře sám, jen když tím nic nepřekryju
+      if (!jinyPanel) zobraz("pomodoro");
+      else toast("☕", "Blok hotový", "Dej si pauzu, časovač běží.");
+    } else {
+      zvuk("budicek");
+      vibruj([120, 80, 120, 80, 120]);
+      toast("🍅", skoncila === "prace" ? "Blok i pauza uběhly" : "Pauza skončila",
+        "Klepni na 🍅 a začni další blok.");
+      animuj(el.pomodoro, "pulz");
+    }
+  }
+
+  function vykresliPom() {
+    var vyp = !pom.delka;
+    el.pomodoro.classList.toggle("skryte", vyp);
+    el.volbaPomodoro.value = String(pom.delka);
+    if (vyp) return;
+
+    var zbyva = pomZbyva(), plna = delkaFaze(pom);
+    var pauza = pom.faze !== "prace";
+    var cas = mmss(zbyva);
+
+    el.pomodoro.textContent = (pauza ? "☕ " : "🍅 ") + cas;
+    el.pomodoro.classList.toggle("bezi", pom.bezi && !pauza);
+    el.pomodoro.classList.toggle("pauza", pauza);
+
+    if (el.panelPomodoro.classList.contains("skryte")) return;
+
+    el.pomCas.textContent = cas;
+    el.pomHodiny.className = "pom-hodiny" + (pauza ? " pauza" : pom.bezi ? " bezi" : "");
+    var blok = pom.hotovo + 1, d = POM_DELKY[pom.delka];
+    var faze, rada;
+    if (pom.faze === "pauza") {
+      faze = "Krátká pauza";
+      rada = "Vstaň od tabletu, protáhni se, napij se a podívej se z okna do dálky. "
+        + "Další otázky teď nečti, mozek si právě ukládá, co ses naučil.";
+    } else if (pom.faze === "dlouha") {
+      faze = "Dlouhá pauza";
+      rada = "Čtyři bloky za sebou, zasloužená delší pauza. Projdi se nebo si dej něco k jídlu.";
+    } else if (pom.bezi) {
+      faze = "Soustředění · blok " + blok + " ze " + POM_DO_DLOUHE;
+      rada = "Jen otázky. Telefon a zprávy počkají do pauzy.";
+    } else if (zbyva < plna) {
+      faze = "Pozastaveno · blok " + blok + " ze " + POM_DO_DLOUHE;
+      rada = "Pokračuj, až budeš mít klid.";
+    } else {
+      faze = "Připraveno · blok " + blok + " ze " + POM_DO_DLOUHE;
+      rada = d.prace + " minut soustředění, potom " + d.pauza + " minut pauza. "
+        + "Po čtvrtém bloku přijde delší pauza " + d.dlouha + " minut.";
+    }
+    var n = pomDnes();
+    if (n) rada += " Dnes máš za sebou " + n + " " + sklon(n, "blok", "bloky", "bloků") + ".";
+    el.pomFaze.textContent = faze;
+    el.pomRada.textContent = rada;
+
+    el.pomTecky.textContent = "";
+    var plnych = pom.faze === "dlouha" ? POM_DO_DLOUHE : pom.hotovo;
+    for (var i = 0; i < POM_DO_DLOUHE; i++) {
+      var t = document.createElement("span");
+      if (i < plnych) t.className = "plna";
+      else if (i === plnych && pom.faze === "prace" && (pom.bezi || zbyva < plna)) t.className = "tato";
+      el.pomTecky.appendChild(t);
+    }
+
+    el.pomStart.textContent = pom.bezi ? "Pozastavit" : (zbyva < plna ? "Pokračovat" : "Start");
+    var preskocit = document.getElementById("btnPomPreskocit");
+    preskocit.textContent = pauza ? "Konec pauzy" : "Přeskočit";
+    preskocit.disabled = !pauza && !pom.bezi && zbyva >= plna;   // nezačatý blok není co přeskočit
+  }
+
+  function nastavPomodoro() {
+    pom = nactiPom();
+    el.pomodoro.addEventListener("click", function () {
+      zobraz("pomodoro");
+      vykresliPom();
+    });
+    el.pomStart.addEventListener("click", function () {
+      if (pom.bezi) pomPozastav(); else pomSpust();
+      ulozPom(); vykresliPom();
+    });
+    document.getElementById("btnPomPreskocit").addEventListener("click", function () {
+      var bylaPauza = pom.faze !== "prace";
+      pomDalsiFaze(Date.now(), false);
+      if (bylaPauza) pomSpust();            // konec pauzy znamená rovnou do práce
+      ulozPom(); vykresliPom();
+    });
+    document.getElementById("btnPomReset").addEventListener("click", function () {
+      pom.hotovo = 0;
+      pomFaze("prace", 0, false);
+      ulozPom(); vykresliPom();
+    });
+    document.getElementById("btnPomZavrit").addEventListener("click", zavri);
+    el.volbaPomodoro.addEventListener("change", function () {
+      var n = parseInt(el.volbaPomodoro.value, 10);
+      if (n !== 0 && !POM_DELKY[n]) return;
+      pom.delka = n;
+      pom.hotovo = 0;
+      pomFaze("prace", 0, false);
+      ulozPom(); vykresliPom();
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) pomTik();
+    });
+    setInterval(pomTik, 1000);
+    pomTik();
+  }
+
   // ---------------------------------------------------------- ovládání
 
   el.dalsi.addEventListener("click", vpred);
@@ -2117,6 +2358,7 @@
   oznacPrepinac(document.getElementById("prepinacRezim"), "data-rezim", "zkouseni");
   oznacPrepinac(document.getElementById("prepinacPoradi"), "data-poradi", "id");
   nastavOvladaniHry();
+  nastavPomodoro();
   prazdno("Načítám otázky\u2026");
 
   // Otázky leží v otazky_data.txt vedle aplikace. Service worker je drží

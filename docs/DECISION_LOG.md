@@ -246,6 +246,40 @@ ID kapitoly (např. „A1–A10“). Export zálohy je obsahuje v poli `kapitoly
 je slučuje maximem; starší zálohy bez něj se načtou jako dřív. Vynulování statistik
 maže i hvězdičky.
 
+## Pomodoro (26. 9. 2026)
+
+Tom chtěl časovač soustředění pro učení i zkoušení. Vznikl jeden společný
+časovač pro všechny tři režimy, protože při přepnutí ze zkoušení do kapitol
+nebo učení se pořád učí a blok by se neměl přerušit. V liště vedle série je
+tlačítko s rajčetem a zbývajícím časem, klepnutím se otevře panel s velkými
+hodinami, tlačítky Start/Pozastavit, Přeskočit a Vynulovat.
+
+Výchozí nastavení je klasické pomodoro podle Francesca Cirilla: 25 minut práce,
+5 minut pauza a po čtyřech blocích 15 minut. Pro opakované vybavování
+odpovědí z paměti je to rozumná délka, soustředění na dlouhé legislativní
+formulace po zhruba půl hodině slábne a krátké pauzy pomáhají naučené uložit.
+Na výběr
+je ještě 50 + 10 minut (delší soustředění, dlouhá pauza 30) a 15 + 3 minuty
+(únavné dny, dlouhá pauza 10), případně se časovač dá vypnout. Volba je
+v panelu Okruhy vedle cíle.
+
+Po skončení bloku zazní gong, tablet zavibruje a sám se otevře panel s pauzou
+a radou, co během ní dělat. Pauza běží sama. Když skončí, ozve se krátká
+znělka a toast, další blok ale začne až po klepnutí na Start, aby neběžel,
+když Tom od tabletu odešel. Pokud je zrovna otevřený jiný panel (třeba úprava
+otázek), panel pauzy se neotevře a stačí toast, aby se nic nepřekrylo. Zvuk
+a vibrace se řídí stejnými přepínači jako hra.
+
+Čas se počítá z okamžiku konce fáze, ne z počtu tiků. Android v uspané
+aplikaci časovače zastavuje, takže po návratu se dopočítá, co mezitím uběhlo,
+i kdyby skončil blok i pauza po něm. Oznámení mimo aplikaci (se zhasnutou
+obrazovkou) spolehlivě bez serveru udělat nejde, proto se nezavádělo.
+
+Stav časovače (fáze, konec, počet bloků v cyklu a dnešní počet bloků) leží pod
+novým klíčem `zkousec-mik-pomodoro-v1`, takže přežije zavření aplikace.
+Plánovač, statistiky, hra ani záloha o časovači nevědí, vynulování statistik
+ho nemění.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných
