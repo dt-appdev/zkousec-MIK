@@ -290,11 +290,15 @@ je stejný jako u Uložit zálohu, jen jméno souboru nese datum, aby se zálohy
 disku nepřepisovaly.
 
 Chrome na Androidu povoluje sdílet jen vybrané typy souborů a soubor .json mezi
-nimi zatím není. Aplikace proto nejdřív zkusí .json, a když ho prohlížeč
-odmítne, pošle totéž jako .txt. Načíst zálohu nově nabízí i soubory .txt, takže
-takovou zálohu přečte stejně jako dřív uložený .json. Kde sdílení souborů
-prohlížeč neumí (třeba počítač s Linuxem), tlačítko se vůbec neukáže, a kdyby
-sdílení selhalo jinak než zavřením nabídky, záloha se uloží klasicky do souboru.
+nimi není. Záludné je, že kontrola `canShare()` .json propustí a odmítne ho až
+samotné `share()`, takže první verze, která zkoušela nejdřív .json, nabídku
+sdílení nikdy neotevřela a spadla do záložního uložení do Stažených souborů.
+Záloha se proto sdílí vždy jako .txt. Obsah zůstává JSON a Načíst zálohu nově
+nabízí i soubory .txt, takže ji přečte stejně jako dřív uložený .json. Kde
+sdílení souborů prohlížeč neumí (třeba počítač s Linuxem), tlačítko se vůbec
+neukáže. Když sdílení selže jinak než zavřením nabídky, aplikace už potichu
+neukládá do souboru, ale vypíše hlášku i s názvem chyby, aby se dala dohledat
+příčina.
 
 ## Zásady komunikace
 
