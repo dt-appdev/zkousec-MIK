@@ -1154,28 +1154,26 @@
   }
 
   // sdílení přes systémovou nabídku (Disk Google, e-mail, OneDrive…);
-  // Chrome na Androidu soubory .json sdílet nedovolí, pak jde záloha jako .txt
-  // se stejným obsahem, který „Načíst zálohu“ přečte stejně
+  // záloha jde vždy jako .txt: Chrome na Androidu .json v canShare() propustí,
+  // ale share() ho pak odmítne (NotAllowedError), takže nabídka se neotevře.
+  // Obsah je pořád JSON a „Načíst zálohu“ ho přečte stejně
   function souborKeSdileni(obsah) {
-    if (!navigator.canShare || typeof File !== "function") return null;
+    if (!navigator.share || !navigator.canShare || typeof File !== "function") return null;
     var d = new Date();
     var jmeno = "zkousec-zaloha-" + d.getFullYear() + "-"
-      + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
-    var varianty = [[".json", "application/json"], [".txt", "text/plain"]];
-    for (var i = 0; i < varianty.length; i++) {
-      try {
-        var f = new File([obsah], jmeno + varianty[i][0], { type: varianty[i][1] });
-        if (navigator.canShare({ files: [f] })) return f;
-      } catch (e) { /* další varianta */ }
+      + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2) + ".txt";
+    try {
+      var f = new File([obsah], jmeno, { type: "text/plain" });
+      return navigator.canShare({ files: [f] }) ? f : null;
+    } catch (e) {
+      return null;
     }
-    return null;
   }
 
   function sdilejZalohu() {
     var f = souborKeSdileni(obsahZalohy());
     if (!f) {
-      el.statHlaska.textContent = "Sdílení tu nejde, záloha se uloží do souboru.";
-      exportujStatistiku();
+      el.statHlaska.textContent = "Tento prohlížeč sdílení souborů neumí, použij Uložit zálohu.";
       return;
     }
     el.statHlaska.textContent = "";
@@ -1183,8 +1181,8 @@
       el.statHlaska.textContent = "Záloha odeslána.";
     }, function (e) {
       if (e && e.name === "AbortError") return;      // nabídku zavřel uživatel
-      el.statHlaska.textContent = "Sdílení se nepovedlo, záloha se uloží do souboru.";
-      exportujStatistiku();
+      el.statHlaska.textContent = "Sdílení se nepovedlo ("
+        + ((e && e.name) || "neznámá chyba") + "), použij Uložit zálohu.";
     });
   }
 
