@@ -392,8 +392,9 @@
   // Kapitola je nejvýš deset po sobě jdoucích otázek jednoho okruhu v pořadí
   // podle ID, takže příbuzné otázky jdou za sebou. Odpovídá se hned jako ve
   // zkoušecím módu a po každé odpovědi je vidět správné znění i předpis.
-  // Odpovědi se počítají jen do hry (XP, série, denní cíl, odznaky), statistiky
-  // ani Leitnerovy úrovně se nemění, takže plánovač o kapitolách neví.
+  // Odpovědi se počítají do hry (XP, série, denní cíl, odznaky). Do statistik
+  // se zapíše jen chyba (počet chyb, úroveň na 0), správná odpověď statistiku
+  // ani Leitnerovu úroveň nemění.
   // Hvězdičky za nejlepší průchod kapitolou leží pod vlastním klíčem.
 
   var KAP_ULOZISTE = "zkousec-mik-kapitoly-v1";
@@ -663,11 +664,21 @@
     vykresliKapOtazku(false);
     el.kapDalsi.focus({ preventScroll: true });
 
-    // jen do hry; úroveň otázky se jen čte, statistika zůstává netknutá
-    var s = statistika[klic(z.o)];
-    var u = urovenOtazky(z.o);
+    // Chyba se zapíše do statistik stejně jako ve zkoušení (úroveň na 0), aby
+    // ji plánovač brzy vrátil. Správná odpověď statistiku nechá být, protože
+    // opakovaný průchod kapitolou by jinak úrovně vyhnal bez skutečného vybavení.
+    var u = urovenOtazky(z.o), s;
+    if (trefa) {
+      s = statistika[klic(z.o)];
+    } else {
+      s = statZaznam(z.o);
+      s.ne++;
+      s.uroven = 0;
+      s.kdy = Date.now();
+      ulozUlozene();
+    }
     hraPoOdpovedi({
-      trefa: trefa, urovenPred: u, urovenPo: u, neCelkem: s ? s.ne || 0 : 0,
+      trefa: trefa, urovenPred: u, urovenPo: trefa ? u : 0, neCelkem: s ? s.ne || 0 : 0,
       znovu: false, tlacitko: el.odpovedi.children[index]
     });
   }

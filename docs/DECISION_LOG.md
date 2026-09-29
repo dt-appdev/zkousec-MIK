@@ -241,6 +241,16 @@ zkoušecího módu zůstává přesně jako dřív; úroveň otázky se pro výp
 Protože se úroveň nemění, bonus „Zvládnuto!“ ani odznak za otázku vytaženou
 z chyb se v kapitolách získat nedá.
 
+**Změna 29. 9. 2026:** chyba v kapitole se nově zapisuje do statistik stejně
+jako ve zkoušecím módu, tedy přičte se k počtu chyb, úroveň otázky spadne na 0
+a uloží se čas. Plánovač ji tak brzy vrátí a objeví se i v přehledu „k doučení“.
+Dřív se chyba ztratila a otázka na vysoké úrovni se mohla vrátit až za dva týdny,
+přestože ji Tom v kapitole zrovna spletl. Správná odpověď se dál nezapisuje,
+protože kapitola jde po příbuzných otázkách za sebou a dá se hned zopakovat;
+úrovně by tím vyrostly bez skutečného vybavení z paměti. Návrat chybné otázky
+později v sezení (značka „znovu“) patří jen ke zkoušecímu módu a do kapitol se
+nepřenáší.
+
 Hvězdičky leží pod novým klíčem `zkousec-mik-kapitoly-v1`, klíčované rozsahem
 ID kapitoly (např. „A1–A10“). Export zálohy je obsahuje v poli `kapitoly`, import
 je slučuje maximem; starší zálohy bez něj se načtou jako dřív. Vynulování statistik
