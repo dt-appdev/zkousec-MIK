@@ -1122,12 +1122,14 @@
     }
   }
 
+  function obsahZalohy() {
+    return JSON.stringify({ verze: 2, ulozeno: Date.now(), statistika: statistika, hra: hra,
+                            kapitoly: kapHvezdy }, null, 1);
+  }
+
   function exportujStatistiku() {
     try {
-      var blob = new Blob(
-        [JSON.stringify({ verze: 2, ulozeno: Date.now(), statistika: statistika, hra: hra,
-                         kapitoly: kapHvezdy }, null, 1)],
-        { type: "application/json" });
+      var blob = new Blob([obsahZalohy()], { type: "application/json" });
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "zkousec-statistika.json";
@@ -1138,6 +1140,41 @@
     } catch (e) {
       el.statHlaska.textContent = "Zálohu se nepodařilo vytvořit.";
     }
+  }
+
+  // sdílení přes systémovou nabídku (Disk Google, e-mail, OneDrive…);
+  // Chrome na Androidu soubory .json sdílet nedovolí, pak jde záloha jako .txt
+  // se stejným obsahem, který „Načíst zálohu“ přečte stejně
+  function souborKeSdileni(obsah) {
+    if (!navigator.canShare || typeof File !== "function") return null;
+    var d = new Date();
+    var jmeno = "zkousec-zaloha-" + d.getFullYear() + "-"
+      + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    var varianty = [[".json", "application/json"], [".txt", "text/plain"]];
+    for (var i = 0; i < varianty.length; i++) {
+      try {
+        var f = new File([obsah], jmeno + varianty[i][0], { type: varianty[i][1] });
+        if (navigator.canShare({ files: [f] })) return f;
+      } catch (e) { /* další varianta */ }
+    }
+    return null;
+  }
+
+  function sdilejZalohu() {
+    var f = souborKeSdileni(obsahZalohy());
+    if (!f) {
+      el.statHlaska.textContent = "Sdílení tu nejde, záloha se uloží do souboru.";
+      exportujStatistiku();
+      return;
+    }
+    el.statHlaska.textContent = "";
+    navigator.share({ files: [f], title: "Záloha Zkoušeče MIK" }).then(function () {
+      el.statHlaska.textContent = "Záloha odeslána.";
+    }, function (e) {
+      if (e && e.name === "AbortError") return;      // nabídku zavřel uživatel
+      el.statHlaska.textContent = "Sdílení se nepovedlo, záloha se uloží do souboru.";
+      exportujStatistiku();
+    });
   }
 
   function nactiZalohu(soubor) {
@@ -2283,6 +2320,10 @@
     vykresliOkruhy(); zobraz("okruhy");
   });
   document.getElementById("btnStatExport").addEventListener("click", exportujStatistiku);
+  if (souborKeSdileni("{}")) {
+    document.getElementById("btnStatSdilet").classList.remove("skryte");
+  }
+  document.getElementById("btnStatSdilet").addEventListener("click", sdilejZalohu);
   document.getElementById("btnStatImport").addEventListener("click", function () {
     document.getElementById("statSoubor").click();
   });

@@ -280,6 +280,22 @@ novým klíčem `zkousec-mik-pomodoro-v1`, takže přežije zavření aplikace.
 Plánovač, statistiky, hra ani záloha o časovači nevědí, vynulování statistik
 ho nemění.
 
+## Sdílení zálohy (29. 9. 2026)
+
+V panelu Statistiky přibylo tlačítko Sdílet zálohu. Otevře systémovou nabídku
+sdílení Androidu, takže zálohu jde poslat rovnou na Disk Google, do OneDrivu,
+e-mailem nebo kamkoli jinam, co je v tabletu nainstalované. Používá se Web Share
+API, které funguje offline a bez jakékoli knihovny či přihlašování. Obsah zálohy
+je stejný jako u Uložit zálohu, jen jméno souboru nese datum, aby se zálohy na
+disku nepřepisovaly.
+
+Chrome na Androidu povoluje sdílet jen vybrané typy souborů a soubor .json mezi
+nimi zatím není. Aplikace proto nejdřív zkusí .json, a když ho prohlížeč
+odmítne, pošle totéž jako .txt. Načíst zálohu nově nabízí i soubory .txt, takže
+takovou zálohu přečte stejně jako dřív uložený .json. Kde sdílení souborů
+prohlížeč neumí (třeba počítač s Linuxem), tlačítko se vůbec neukáže, a kdyby
+sdílení selhalo jinak než zavřením nabídky, záloha se uloží klasicky do souboru.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných
