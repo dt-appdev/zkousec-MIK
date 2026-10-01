@@ -18,7 +18,8 @@ z větve `main`, cílové zařízení je Android tablet v Chrome, nainstalovaný
 - Plánovač (Leitner, úrovně 0–5, fronta, relaps), historie zkoušecího módu a učící
   mód jsou odladěné. Neměnit bez výslovného zadání.
 - Gamifikace jen poslouchá živé odpovědi ve zkoušecím módu a v kapitolách
-  (`hraPoOdpovedi`), nikdy nesmí ovlivnit plánovač ani statistiky. Kapitoly zapisují
+  (`hraPoOdpovedi`) a jednou souhrnně odevzdaný test (`hraPoTestu`), nikdy nesmí
+  ovlivnit plánovač ani statistiky. Kapitoly zapisují
   do statistik jen chyby (úroveň na 0), správné odpovědi ne.
 - Při přidání souboru, který má fungovat offline, ho zapiš do `SOUBORY` v `sw.js`
   a zvyš číslo v `CACHE`.

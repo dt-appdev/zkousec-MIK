@@ -195,22 +195,34 @@ test("každá otázka testu má 3 možnosti: 1 správnou a 2 různé distraktory
   }
 });
 
-test("výběr je rovnoměrný: v každé části se okruhy liší nejvýš o 1 otázku", function () {
-  for (var n = 0; n < 500; n++) {
-    var t = T.sestavTest(otazky);
-    ["obecna", "oborova"].forEach(function (c) {
-      var pocty = {};
-      Object.keys(poOkruzich).forEach(function (s) { if (T.castOkruhu(s) === c) pocty[s] = 0; });
-      t.forEach(function (p) { if (p.cast === c) pocty[p.o.sekce]++; });
-      // okruh, který má méně otázek, než by mu připadlo, dá všechny
-      var max = 0;
-      Object.keys(pocty).forEach(function (s) { max = Math.max(max, pocty[s]); });
-      Object.keys(pocty).forEach(function (s) {
-        assert.ok(pocty[s] >= Math.min(poOkruzich[s], max - 1),
-          c + " okruh " + s + ": " + pocty[s] + " při maximu " + max);
-      });
-    });
+test("z každého okruhu padne v každém testu aspoň jedna otázka", function () {
+  for (var n = 0; n < 1000; n++) {
+    var t = T.sestavTest(otazky), v = {};
+    t.forEach(function (p) { v[p.o.sekce] = true; });
+    Object.keys(poOkruzich).forEach(function (s) { assert.ok(v[s], "chybí okruh " + s); });
   }
+});
+
+var PRUMERY = 4000, prumer = {};
+(function () {
+  for (var n = 0; n < PRUMERY; n++) {
+    T.sestavTest(otazky).forEach(function (p) { prumer[p.o.sekce] = (prumer[p.o.sekce] || 0) + 1 / PRUMERY; });
+  }
+  console.log("  (průměrně otázek na test: " + Object.keys(prumer).sort().map(function (s) {
+    return s + " " + prumer[s].toFixed(2);
+  }).join(", ") + ")");
+})();
+
+test("zbylá místa úměrně velikosti: průměr = 1 + zbylá místa × podíl zbylých otázek okruhu", function () {
+  ["obecna", "oborova"].forEach(function (c) {
+    var okr = Object.keys(poOkruzich).filter(function (s) { return T.castOkruhu(s) === c; });
+    var zbyle = castiSoucet[c] - okr.length, mist = T.TEST_CASTI[c].pocet - okr.length;
+    okr.forEach(function (s) {
+      var ocekavano = 1 + mist * (poOkruzich[s] - 1) / zbyle;
+      assert.ok(Math.abs(prumer[s] - ocekavano) < 0.1,
+        s + ": průměr " + prumer[s].toFixed(2) + ", očekáváno " + ocekavano.toFixed(2));
+    });
+  });
 });
 
 test("otázka s jediným distraktorem se do testu nevybere", function () {
@@ -230,6 +242,39 @@ test("když oborová část nemá 10 otázek, test se nesestaví", function () {
   var bez = otazky.filter(function (o) { return T.castOkruhu(o.sekce) === "obecna"; })
     .concat(otazky.filter(function (o) { return o.sekce === "L"; }).slice(0, 9));
   assert.strictEqual(T.sestavTest(bez), null);
+});
+
+test("otázky z nedávných testů se vyberou, jen když v okruhu jiné nezbydou", function () {
+  for (var n = 0; n < 500; n++) {
+    var predtim = T.sestavTest(otazky), vynechat = {};
+    predtim.forEach(function (p) { vynechat[p.k] = true; });
+    var t = T.sestavTest(otazky, vynechat);
+    var vybrano = {}, opakovano = {};
+    t.forEach(function (p) {
+      vybrano[p.o.sekce] = (vybrano[p.o.sekce] || 0) + 1;
+      if (vynechat[p.k]) opakovano[p.o.sekce] = (opakovano[p.o.sekce] || 0) + 1;
+    });
+    Object.keys(opakovano).forEach(function (s) {
+      var cerstvych = otazky.filter(function (o) { return o.sekce === s && !vynechat[o.id]; }).length;
+      // zopakovat se smí jen tolik, kolik chybí do počtu vybraného z okruhu
+      assert.ok(opakovano[s] <= Math.max(0, vybrano[s] - cerstvych),
+        "okruh " + s + ": zopakováno " + opakovano[s] + ", vybráno " + vybrano[s] + ", čerstvých " + cerstvych);
+    });
+    assert.strictEqual(t.length, 30);
+  }
+});
+
+test("okruh R se opakuje i s vynecháním, protože víc otázek nemá", function () {
+  var t1 = T.sestavTest(otazky), v = {};
+  t1.forEach(function (p) { v[p.k] = true; });
+  var t2 = T.sestavTest(otazky, v);
+  assert.ok(t2.some(function (p) { return p.o.sekce === "R" && v[p.k]; }), "R1 je v každém testu");
+});
+
+test("XP za test: 10 za správnou, 2 za chybnou, 50 za vyhověl", function () {
+  assert.strictEqual(T.xpZaTest(0, 0, false), 0);
+  assert.strictEqual(T.xpZaTest(20, 8, false), 216);
+  assert.strictEqual(T.xpZaTest(26, 4, true), 318);
 });
 
 console.log("\n" + (testu - chyb) + " z " + testu + " testů prošlo.");

@@ -322,21 +322,29 @@ není. Obecná část má 373 otázek (A 97, B 5, C 30, D 43, E 18, F 20, G 34, 
 I 40, J 13, K 27), oborová 96 (L 46, M 14, N 10, O 21, P 4, R 1).
 
 Test má 30 otázek, 20 z obecné a 10 z oborové části, a na výběr okruhů nehledí.
-V každé části se otázky berou kolo po kole z každého okruhu jedna, v náhodném
-pořadí okruhů, takže se počty z jednotlivých okruhů liší nejvýš o jednu. Tom to
-chtěl kvůli Pokynům, které žádají pokrýt co nejvíc právních oborů. Důsledkem je,
-že malé okruhy jsou v testu silně nadreprezentované: jediná otázka okruhu R a
-čtyři otázky okruhu P padnou do každého testu, kdežto z 97 otázek okruhu A padnou
-jedna nebo dvě. Možnosti se losují stejně jako jinde (správná a dvě náhodné špatné)
+V každé části padne z každého okruhu nejdřív jedna otázka, aby test pokryl všechny
+právní obory, jak žádají Pokyny, a zbylá místa se losují ze všech ostatních otázek
+části stejnou měrou, takže větší okruh dostane úměrně víc. V průměru to dělá
+u okruhu A 3,4 otázky z dvaceti, u L 3 z deseti; okruh R s jedinou otázkou je
+v každém testu. Tom nejdřív zvolil čistě rovnoměrný výběr (z každého okruhu
+stejně, A by pak měl jen jednu až dvě otázky), po rozboru přešel na tenhle
+smíšený. Čistě úměrný výběr by okruhu A dal v průměru 5,2 otázky, ale malé
+okruhy by v mnoha testech chyběly. Otázky z posledních dvou testů se berou až
+nakonec, tedy jen tehdy, když jiné nezbydou, aby každý další test řekl něco
+nového. Možnosti se losují stejně jako jinde (správná a dvě náhodné špatné)
 a během testu se nemění. Otázka s méně než dvěma distraktory se do testu
 nevybírá; v současných datech mají všechny aspoň čtyři.
 
 Odpočet běží od časové značky začátku, takže sedí i po uspání tabletu. Během testu
-se neukazuje správnost ani předpis, odpověď lze měnit a mezi otázkami volně
-přecházet, nad otázkou je tabulka 30 políček rozdělená na obě části. Lišta hry
-je během testu skrytá. Po vypršení času se test odevzdá sám, nezodpovězená otázka
-má 0 bodů. Délku testu jde pro zkoušení aplikace zkrátit parametrem
-`?testlimit=sekundy` v adrese.
+se neukazuje správnost, předpis ani ID otázky (prozradilo by okruh; ID je až ve
+výsledcích). Odpověď lze měnit a mezi otázkami volně přecházet, nad otázkou je
+tabulka 30 políček rozdělená na obě části. Lišta hry je během testu skrytá a do
+jiného režimu přepnout nejde, dokud test není odevzdaný, protože učící mód by
+prozradil správné odpovědi; panel Statistiky přístupný zůstává. Když během testu
+skončí blok pomodora, ukáže se jen tichá zpráva bez zvuku a bez panelu pauzy.
+Odevzdání se vždy potvrzuje, s počtem nezodpovězených otázek, pokud nějaké jsou.
+Po vypršení času se test odevzdá sám, nezodpovězená otázka má 0 bodů. Délku testu
+jde pro zkoušení aplikace zkrátit parametrem `?testlimit=sekundy` v adrese.
 
 Hodnotí se každá část zvlášť v celých bodech podle Pokynů AR ČKAIT 9/24: obecná
 16 a víc vyhověl, 11 až 15 doplňující otázky, jinak nevyhověl; oborová 8 a víc
@@ -347,11 +355,18 @@ stejně.
 
 Při odevzdání se odpovědi zapíšou do statistik stejně jako ve zkoušení: správná
 zvedne Leitnerovu úroveň o jednu, chybná ji shodí na 0. Nezodpovězené otázky se
-nezapisují, protože u nich nedošlo k žádnému pokusu o vybavení. Hra o testu neví
-(žádné XP, série ani denní cíl), podle pravidla, že poslouchá jen zkoušení a
-kapitoly. Tlačítko Procvičit chyby přepne do zkoušení omezeného jen na chybné a
-nezodpovězené otázky testu; omezení zruší klepnutí na okruh, Vybrat vše, Zrušit
-vše nebo přepnutí do jiného režimu.
+nezapisují, protože u nich nedošlo k žádnému pokusu o vybavení a často jen došel
+čas. Do hry se test započte jednou, při odevzdání: zodpovězené otázky se přičtou
+k dennímu cíli a XP je 10 za správnou, 2 za chybnou a 50 navíc za celkové vyhověl,
+bez bonusů za úroveň a sérii. Série správně v řadě se nemění. Tom to výslovně
+schválil jako výjimku z pravidla, že hra poslouchá jen živé odpovědi; jinak by
+nejnáročnější trénink denní cíl prakticky trestal.
+
+Tlačítko Procvičit chyby přepne do zkoušení omezeného jen na chybné a
+nezodpovězené otázky testu. Historie si u každého testu pamatuje jeho otázky
+i chyby, takže procvičit jde i chyby kteréhokoli staršího testu nebo všech testů
+dohromady (tlačítka v historii v panelu Statistiky a na úvodu testu). Omezení
+zruší klepnutí na okruh, Vybrat vše, Zrušit vše nebo přepnutí do jiného režimu.
 
 Rozpracovaný test a historie testů leží pod novým klíčem `zkousec-mik-testy-v1`.
 Po návratu do aplikace se nabídne pokračování, a když čas mezitím vypršel, test

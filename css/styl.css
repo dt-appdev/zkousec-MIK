@@ -1170,3 +1170,16 @@ body { overscroll-behavior: none; }
 .test-chyby .test-tvoje { margin-top: 4px; color: var(--chyba) !important; line-height: 1.35; }
 .test-chyby .test-odkaz { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--znak); line-height: 1.4; }
 .tlacitka.test-akce { padding: 0 0 12px; }
+.test-procvicit {
+  display: block;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--znak);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
