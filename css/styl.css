@@ -1060,3 +1060,113 @@ body { overscroll-behavior: none; }
   line-height: 1.5;
 }
 .tlacitka button:disabled { opacity: .4; cursor: default; }
+
+/* ---------- test nanečisto ---------- */
+
+.app.rezim-test .kolo,
+.app.test-bezi .hra-lista { display: none !important; }
+
+.test-tabulka { display: none; }
+.app.test-bezi .test-tabulka {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: -4px 0 14px;
+}
+.test-skupina { flex: 2 1 280px; min-width: 0; }
+.test-skupina.oborova { flex: 1 1 140px; }
+.test-cast {
+  margin-bottom: 4px;
+  color: var(--tlumene);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.test-skupina.oborova .test-cast { color: var(--zlato); }
+.test-mriz {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+.test-skupina.oborova .test-mriz { grid-template-columns: repeat(5, 1fr); }
+.test-policko {
+  height: 30px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--linka);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--tlumene);
+  font: inherit;
+  font-size: .74rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.test-policko.zodpovezeno { border-color: var(--znak); background: var(--znak); color: #fff; }
+.test-policko.aktualni { outline: 2px solid var(--inkoust); outline-offset: 1px; }
+
+.idcko .test-stitek {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--panel);
+  border: 1px solid var(--linka);
+  color: var(--znak);
+  font-size: .72rem;
+  vertical-align: 1px;
+}
+.idcko .test-stitek.oborova { color: var(--zlato); border-color: var(--zlato); background: var(--zlato-bg); }
+
+/* zvolená odpověď během testu: neutrálně, bez prozrazení správnosti */
+.odpoved.zvolena { border-color: var(--znak); box-shadow: inset 0 0 0 1px var(--znak); }
+.odpoved.zvolena .pismeno { border-right-color: var(--znak); background: var(--znak); color: #fff; }
+
+#patickaTest .dalsi { flex: 1; width: auto; }
+#patickaTest .dalsi:disabled { opacity: .4; cursor: default; }
+.odevzdat {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 15px 14px;
+  border: 1px solid var(--inkoust);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--inkoust);
+  font: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.skore.test-cas { color: var(--inkoust); font-size: 1rem; }
+.skore.test-cas b { font-size: 1.15rem; }
+.skore.dochazi, .skore.dochazi b { color: var(--chyba); }
+
+.test-verdikt {
+  display: inline-block;
+  margin: 4px 0 10px;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.test-verdikt.vyhovel    { background: var(--spravne-bg); color: var(--spravne); }
+.test-verdikt.doplnujici { background: var(--pozor-bg);   color: var(--pozor); }
+.test-verdikt.nevyhovel  { background: var(--chyba-bg);   color: var(--chyba); }
+
+.radek .cislo.verdikt { font-weight: 700; }
+.radek .cislo.verdikt.vyhovel    { color: var(--spravne); }
+.radek .cislo.verdikt.doplnujici { color: var(--pozor); }
+.radek .cislo.verdikt.nevyhovel  { color: var(--chyba); }
+
+.seznam.test-seznam { flex: none; overflow: visible; margin-bottom: 12px; }
+.posuv .seznam.test-seznam { margin-bottom: 0; }
+.test-chyby { margin-bottom: 0; }
+.test-chyby .test-tvoje { margin-top: 4px; color: var(--chyba) !important; line-height: 1.35; }
+.test-chyby .test-odkaz { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--znak); line-height: 1.4; }
+.tlacitka.test-akce { padding: 0 0 12px; }

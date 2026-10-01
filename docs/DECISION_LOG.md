@@ -310,6 +310,60 @@ neukáže. Když sdílení selže jinak než zavřením nabídky, aplikace už p
 neukládá do souboru, ale vypíše hlášku i s názvem chyby, aby se dala dohledat
 příčina.
 
+## Test nanečisto (1. 10. 2026)
+
+Přibyl čtvrtý režim Test, který co nejvěrněji napodobuje písemnou část zkoušky.
+Okruhy A až K tvoří obecnou část a ostatní okruhy oborovou. Rozdělení určuje
+jediná konstanta `OBECNE_OKRUHY` v `js/app.js`; okruh, který v ní není, se
+automaticky bere jako oborový, takže nový okruh v datech se zařadí sám. Počítá se
+jen s písmeny na začátku označení okruhu, okruh „J+“ by tedy patřil k J, a parser
+proto nově přijme i ID ve tvaru `[J+3]`. V současných datech žádný takový okruh
+není. Obecná část má 373 otázek (A 97, B 5, C 30, D 43, E 18, F 20, G 34, H 46,
+I 40, J 13, K 27), oborová 96 (L 46, M 14, N 10, O 21, P 4, R 1).
+
+Test má 30 otázek, 20 z obecné a 10 z oborové části, a na výběr okruhů nehledí.
+V každé části se otázky berou kolo po kole z každého okruhu jedna, v náhodném
+pořadí okruhů, takže se počty z jednotlivých okruhů liší nejvýš o jednu. Tom to
+chtěl kvůli Pokynům, které žádají pokrýt co nejvíc právních oborů. Důsledkem je,
+že malé okruhy jsou v testu silně nadreprezentované: jediná otázka okruhu R a
+čtyři otázky okruhu P padnou do každého testu, kdežto z 97 otázek okruhu A padnou
+jedna nebo dvě. Možnosti se losují stejně jako jinde (správná a dvě náhodné špatné)
+a během testu se nemění. Otázka s méně než dvěma distraktory se do testu
+nevybírá; v současných datech mají všechny aspoň čtyři.
+
+Odpočet běží od časové značky začátku, takže sedí i po uspání tabletu. Během testu
+se neukazuje správnost ani předpis, odpověď lze měnit a mezi otázkami volně
+přecházet, nad otázkou je tabulka 30 políček rozdělená na obě části. Lišta hry
+je během testu skrytá. Po vypršení času se test odevzdá sám, nezodpovězená otázka
+má 0 bodů. Délku testu jde pro zkoušení aplikace zkrátit parametrem
+`?testlimit=sekundy` v adrese.
+
+Hodnotí se každá část zvlášť v celých bodech podle Pokynů AR ČKAIT 9/24: obecná
+16 a víc vyhověl, 11 až 15 doplňující otázky, jinak nevyhověl; oborová 8 a víc
+vyhověl, 6 až 7 doplňující otázky, jinak nevyhověl. Celkem nevyhověl, když
+nevyhověla kterákoli část, jinak doplňující otázky, když je v tom pásmu kterákoli
+část, jinak vyhověl. Procenta v Pokynech nejsou konzistentní, body ale vycházejí
+stejně.
+
+Při odevzdání se odpovědi zapíšou do statistik stejně jako ve zkoušení: správná
+zvedne Leitnerovu úroveň o jednu, chybná ji shodí na 0. Nezodpovězené otázky se
+nezapisují, protože u nich nedošlo k žádnému pokusu o vybavení. Hra o testu neví
+(žádné XP, série ani denní cíl), podle pravidla, že poslouchá jen zkoušení a
+kapitoly. Tlačítko Procvičit chyby přepne do zkoušení omezeného jen na chybné a
+nezodpovězené otázky testu; omezení zruší klepnutí na okruh, Vybrat vše, Zrušit
+vše nebo přepnutí do jiného režimu.
+
+Rozpracovaný test a historie testů leží pod novým klíčem `zkousec-mik-testy-v1`.
+Po návratu do aplikace se nabídne pokračování, a když čas mezitím vypršel, test
+se rovnou vyhodnotí. Záloha obsahuje historii v poli `testy`, import přidá jen
+testy, které ještě nejsou (podle času začátku), a starší zálohy bez něj se
+načtou jako dřív. Vynulování statistik maže i historii testů. Panel Statistiky
+ukazuje posledních deset testů a úspěšnost zvlášť pro obecnou a oborovou část.
+
+Ověřuje to `node testy/test-zkouska.js`, který načte skutečný `js/app.js` do
+Node bez prohlížeče a bez závislostí a ověří rozdělení okruhů, hranice hodnocení
+a sestavení testu.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných

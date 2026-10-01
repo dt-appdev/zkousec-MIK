@@ -12,7 +12,8 @@ z větve `main`, cílové zařízení je Android tablet v Chrome, nainstalovaný
   neupravuj.** Zdrojem je oficiální sada ČKAIT, přebírá se doslova a programově.
   Měnit se smějí jen špatné odpovědi (distraktory), a to jen na výslovné přání.
 - Klíče a schéma localStorage neměň: `zkousec-mik-v1` (statistiky, verze 2)
-  a `zkousec-mik-hra-v1` (gamifikace), `zkousec-mik-kapitoly-v1` (hvězdičky kapitol).
+  a `zkousec-mik-hra-v1` (gamifikace), `zkousec-mik-kapitoly-v1` (hvězdičky kapitol),
+  `zkousec-mik-testy-v1` (rozpracovaný test a historie testů nanečisto).
   Starší exporty záloh musí jít dál načíst.
 - Plánovač (Leitner, úrovně 0–5, fronta, relaps), historie zkoušecího módu a učící
   mód jsou odladěné. Neměnit bez výslovného zadání.
@@ -28,6 +29,7 @@ z větve `main`, cílové zařízení je Android tablet v Chrome, nainstalovaný
 ## Ověření před PR
 
 - `node --check js/app.js sw.js`
+- `node testy/test-zkouska.js` (rozdělení okruhů, hodnocení a sestavení testu)
 - Parser musí načíst všech 469 otázek (panel Okruhy ukazuje počet).
 - Vyzkoušet v prohlížeči přes `python3 -m http.server` a offline reload.
 
@@ -35,5 +37,6 @@ z větve `main`, cílové zařízení je Android tablet v Chrome, nainstalovaný
 
 `index.html` kostra, `css/styl.css`, `js/app.js` (jedna IIFE, sekce oddělené
 komentáři: úložiště, načtení, okruhy, výběr otázky, učící mód, vykreslení,
-kapitoly, statistiky, panely, gamifikace, ovládání, start, PWA), `otazky_data.txt`,
-`sw.js`, `manifest.json`, `ikony/`, `docs/DECISION_LOG.md`.
+kapitoly, test, statistiky, panely, gamifikace, ovládání, start, PWA), `otazky_data.txt`,
+`sw.js`, `manifest.json`, `ikony/`, `docs/DECISION_LOG.md`, `testy/` (Node testy, offline
+se necachují).
