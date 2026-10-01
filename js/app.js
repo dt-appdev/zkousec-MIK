@@ -11,10 +11,15 @@
   var RELAPS_ODSTUP = 18;      // o kolik otázek dál se vrátí chybná otázka
   var DEN = 86400000;
 
+  // Rozdělení okruhů na obecnou a oborovou část písemného testu. Okruh, který
+  // tu není (L, M, N, O, P, R a jakýkoli další), se bere jako oborový.
+  var OBECNE_OKRUHY = "ABCDEFGHIJK";
+
   var vsechny = [];         // všechny načtené otázky
   var nazvy = {};           // písmeno okruhu -> název
   var vybrane = {};         // písmeno okruhu -> true/false
   var aktivni = [];         // otázky vybraných okruhů
+  var omezeni = null;       // klíč otázky -> true, když se procvičují jen chyby z testu
 
   var statistika = {};
   var fronta = [];          // naplánované pořadí otázek pro toto sezení
@@ -43,7 +48,8 @@
    "seznamOkruhu","vstup","hlaska","panelOkruhy","panelOtazky",
    "panelStat","statSouhrn","statSeznam","statHlaska","statPozn",
    "odkazPredpis","patickaZk","patickaUc","prepinacPoradi","popisUceni",
-   "hlaskaKolo","kapObsah","patickaKap","popisKapitol","napovedaKap"].forEach(function (id) {
+   "hlaskaKolo","kapObsah","patickaKap","popisKapitol","napovedaKap",
+   "testTabulka","patickaTest","popisTestu"].forEach(function (id) {
     el[id] = document.getElementById(id);
   });
   el.app = document.getElementById("app");
@@ -73,7 +79,7 @@
 
   // ---------------------------------------------------------- načtení
 
-  var reId = /^\[([A-Za-z]+\d+)\]\s*(.*)$/;
+  var reId = /^\[([A-Za-z]+\+?\d+)\]\s*(.*)$/;     // připouští i okruh typu „J+“
 
   function rozeber(text) {
     var otazky = [], jmena = {}, akt = null;
@@ -146,7 +152,9 @@
   }
 
   function prepocitejAktivni() {
-    aktivni = vsechny.filter(function (o) { return vybrane[o.sekce]; });
+    aktivni = vsechny.filter(function (o) {
+      return omezeni ? omezeni[klic(o)] : vybrane[o.sekce];
+    });
     predchozi = null;
     sestavFrontu();
     if (rezim === "uceni") sestavUcSeznam(aktualni);
@@ -154,7 +162,7 @@
     var vsechnyOkruhy = okruhy();
     var kolik = vsechnyOkruhy.filter(function (k) { return vybrane[k.sekce]; }).length;
     document.getElementById("btnNabidka")
-      .classList.toggle("filtr", kolik < vsechnyOkruhy.length);
+      .classList.toggle("filtr", kolik < vsechnyOkruhy.length || !!omezeni);
   }
 
   function vykresliOkruhy() {
@@ -199,6 +207,7 @@
 
       b.appendChild(z); b.appendChild(j); b.appendChild(p);
       b.addEventListener("click", function () {
+        omezeni = null;
         vybrane[k.sekce] = !vybrane[k.sekce];
         b.setAttribute("aria-pressed", vybrane[k.sekce] ? "true" : "false");
         prepocitejAktivni();
@@ -217,6 +226,12 @@
     var nove = vsechny.filter(function (o) {
       return vybrane[o.sekce] && !videna(o);
     }).length;
+    if (omezeni) {
+      el.souhrn.textContent = "Zkoušení teď procvičuje jen " + aktivni.length + " "
+        + sklon(aktivni.length, "otázku", "otázky", "otázek")
+        + " pokažených v testu. Klepnutím na okruh nebo na Vybrat vše se vrátíš k okruhům.";
+      return;
+    }
     el.souhrn.textContent = "Vybráno " + vyb.length + " z " + sez.length
       + " okruhů, " + otazek + " otázek"
       + (nove ? ", z toho " + nove + " dosud nezkoušených." : ".");
@@ -358,8 +373,13 @@
 
   function nastavRezim(novy) {
     rezim = novy;
-    var uceni = rezim === "uceni", kapitoly = rezim === "kapitoly";
-    el.patickaZk.classList.toggle("skryte", uceni || kapitoly);
+    var uceni = rezim === "uceni", kapitoly = rezim === "kapitoly", test = rezim === "test";
+    el.patickaZk.classList.toggle("skryte", uceni || kapitoly || test);
+    el.patickaTest.classList.toggle("skryte", !test);
+    el.popisTestu.classList.toggle("skryte", !test);
+    el.app.classList.toggle("rezim-test", test);
+    el.app.classList.remove("test-bezi");
+    el.skore.className = "skore";
     el.patickaUc.classList.toggle("skryte", !uceni);
     el.patickaKap.classList.toggle("skryte", !kapitoly);
     el.prepinacPoradi.classList.toggle("skryte", !uceni);
@@ -374,6 +394,8 @@
     } else if (kapitoly) {
       kapBeh = null;
       vykresliKapitoly();
+    } else if (test) {
+      vykresliTestRezim();
     } else {
       predchozi = null;
       vykresliRysky();
@@ -789,6 +811,656 @@
     else if (h > predHvezdy) zvuk("milnik");
   }
 
+  // ---------------------------------------------------------- test
+  //
+  // Simulace písemné části zkoušky: 20 otázek obecné části a 10 oborové,
+  // 30 minut, bez zpětné vazby až do odevzdání. Hodnotí se každá část zvlášť
+  // v celých bodech podle Pokynů AR ČKAIT 9/24. Filtr okruhů se nepoužije.
+  // Čas se počítá z okamžiku začátku, takže odpočet sedí i po uspání tabletu.
+  // Rozpracovaný test i historie leží pod vlastním klíčem. Odpovědi se při
+  // odevzdání zapíšou do statistik stejně jako ve zkoušení (správná zvedne
+  // úroveň, chybná ji shodí na 0); nezodpovězené otázky statistiku nemění.
+  // Hra se dozví o testu až po odevzdání (hraPoTestu): zodpovězené otázky jdou
+  // do denního cíle a XP, série správně v řadě se nemění. Během běžícího testu
+  // nejde přepnout do jiného režimu.
+
+  var TEST_ULOZISTE = "zkousec-mik-testy-v1";
+  var TEST_LIMIT = 30 * 60000;
+  var TEST_NEOPAKOVAT = 2;   // otázky z tolika posledních testů se berou až nakonec
+  var TEST_CASTI = {
+    obecna:  { jmeno: "Obecná část",  pocet: 20, vyhovel: 16, doplnujici: 11 },
+    oborova: { jmeno: "Oborová část", pocet: 10, vyhovel: 8,  doplnujici: 6 }
+  };
+  var VERDIKTY = {
+    vyhovel:    "Vyhověl",
+    doplnujici: "Doplňující otázky",
+    nevyhovel:  "Nevyhověl"
+  };
+
+  // Rozpracovaný nebo poslední odevzdaný test:
+  // { start, limit, konec (null = běží), pozice, neprecteno,
+  //   polozky: [{ o, k: klíč, cast, m: [{ text, sporny, spravna }], v: index nebo null }],
+  //   vysledek: { obecna, oborova, vObecna, vOborova, verdikt, cas, vyprsel } }
+  var testBeh = null;
+  var testUlozeny = null;   // uložený test, než se načtou otázky a dohledají se v něm
+  // [{ kdy, konec, obecna, oborova, verdikt, cas, limit, klice: [], chyby: [] }]
+  // klice jsou všechny otázky testu, chyby ty chybné a nezodpovězené
+  var historieTestu = [];
+
+  // délku testu jde pro zkoušení aplikace zkrátit parametrem ?testlimit=sekundy
+  function limitTestu() {
+    var m = /[?&]testlimit=(\d+)/.exec(location.search || "");
+    return m && +m[1] > 0 ? +m[1] * 1000 : TEST_LIMIT;
+  }
+
+  function pismenoOkruhu(sekce) {
+    var m = /^[A-Z]+/.exec(String(sekce || "").toUpperCase());
+    return m ? m[0] : "";
+  }
+
+  // „J+“ i „J“ patří k J, tedy do obecné části
+  function castOkruhu(sekce) {
+    var p = pismenoOkruhu(sekce);
+    return p.length === 1 && OBECNE_OKRUHY.indexOf(p) >= 0 ? "obecna" : "oborova";
+  }
+
+  function okruhyCasti(c) {
+    var p = okruhy().map(function (k) { return k.sekce; })
+      .filter(function (s) { return castOkruhu(s) === c; });
+    return p.length > 2 ? p[0] + "–" + p[p.length - 1] : p.join(", ");
+  }
+
+  function verdiktCasti(cast, body) {
+    var c = TEST_CASTI[cast];
+    return body >= c.vyhovel ? "vyhovel" : body >= c.doplnujici ? "doplnujici" : "nevyhovel";
+  }
+
+  function verdiktCelkem(a, b) {
+    if (a === "nevyhovel" || b === "nevyhovel") return "nevyhovel";
+    if (a === "doplnujici" || b === "doplnujici") return "doplnujici";
+    return "vyhovel";
+  }
+
+  // n otázek z části: z každého okruhu nejdřív jedna (v náhodném pořadí okruhů,
+  // kdyby míst bylo méně než okruhů), zbylá místa se losují ze všech zbylých
+  // otázek části stejnou měrou, takže větší okruh dostane úměrně víc.
+  // Otázky z nedávných testů (vynechat: klíč -> true) přijdou na řadu, až jiné
+  // nezbydou: u povinné otázky v daném okruhu, u zbylých míst v celé části.
+  function vyberSmisene(otazky, n, vynechat) {
+    function poradi(g) {                       // náhodně, nedávné až na konec
+      var z = zamichej(g.slice());
+      return vynechat
+        ? z.filter(function (o) { return !vynechat[klic(o)]; })
+            .concat(z.filter(function (o) { return vynechat[klic(o)]; }))
+        : z;
+    }
+    var skupiny = {};
+    otazky.forEach(function (o) {
+      var p = pismenoOkruhu(o.sekce) || o.sekce;
+      (skupiny[p] || (skupiny[p] = [])).push(o);
+    });
+    var vysl = [], zbytek = [];
+    zamichej(Object.keys(skupiny)).forEach(function (p) {
+      var g = poradi(skupiny[p]);
+      if (vysl.length < n) vysl.push(g.shift());
+      zbytek = zbytek.concat(g);
+    });
+    zbytek = poradi(zbytek);
+    while (vysl.length < n && zbytek.length) vysl.push(zbytek.shift());
+    return zamichej(vysl);
+  }
+
+  // vrátí položky testu, nebo null, když některá část nemá dost otázek
+  function sestavTest(zdroj, vynechat) {
+    var pouzitelne = zdroj.filter(function (o) { return o.spatne.length >= 2; });
+    var polozky = [];
+    var castiOk = ["obecna", "oborova"].every(function (c) {
+      var fond = pouzitelne.filter(function (o) { return castOkruhu(o.sekce) === c; });
+      if (fond.length < TEST_CASTI[c].pocet) return false;
+      vyberSmisene(fond, TEST_CASTI[c].pocet, vynechat).forEach(function (o) {
+        polozky.push({ o: o, k: klic(o), cast: c, m: sestavMoznosti(o), v: null });
+      });
+      return true;
+    });
+    return castiOk ? polozky : null;
+  }
+
+  function nedavneOtazky() {
+    var vysl = {};
+    historieTestu.slice(-TEST_NEOPAKOVAT).forEach(function (t) {
+      (t.klice || []).forEach(function (k) { vysl[k] = true; });
+    });
+    return vysl;
+  }
+
+  // ---------------------------------------------------------- test: úložiště
+
+  function nactiTesty() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(TEST_ULOZISTE) || "null"); } catch (e) { d = null; }
+    historieTestu = (d && Array.isArray(d.historie)) ? d.historie.filter(platnyZaznamTestu) : [];
+    testUlozeny = (d && d.beh && Array.isArray(d.beh.polozky)) ? d.beh : null;
+  }
+
+  function ulozTesty() {
+    try {
+      localStorage.setItem(TEST_ULOZISTE, JSON.stringify({
+        verze: 1, historie: historieTestu, beh: testBeh || testUlozeny
+      }, function (k, v) { return k === "o" ? undefined : v; }));   // otázky se dohledají podle klíče
+    } catch (e) { /* nevadí */ }
+  }
+
+  function seznamKlicu(x) {
+    return Array.isArray(x) ? x.filter(function (k) { return typeof k === "string"; }) : [];
+  }
+
+  function platnyZaznamTestu(t) {
+    return !!(t && +t.kdy > 0 && typeof t.obecna === "number" && typeof t.oborova === "number");
+  }
+
+  // import ze zálohy: přidá testy, které tu ještě nejsou (podle času začátku)
+  function slucTesty(cizi) {
+    var zname = {}, pridano = 0;
+    historieTestu.forEach(function (t) { zname[t.kdy] = true; });
+    cizi.forEach(function (t) {
+      if (!platnyZaznamTestu(t) || zname[t.kdy]) return;
+      zname[t.kdy] = true;
+      historieTestu.push({ kdy: +t.kdy, konec: +t.konec || 0, obecna: t.obecna, oborova: t.oborova,
+                           verdikt: VERDIKTY[t.verdikt] ? t.verdikt : verdiktCelkem(
+                             verdiktCasti("obecna", t.obecna), verdiktCasti("oborova", t.oborova)),
+                           cas: +t.cas || 0, limit: +t.limit || TEST_LIMIT,
+                           klice: seznamKlicu(t.klice), chyby: seznamKlicu(t.chyby) });
+      pridano++;
+    });
+    historieTestu.sort(function (a, b) { return a.kdy - b.kdy; });
+    if (pridano) ulozTesty();
+    return pridano;
+  }
+
+  // po načtení otázek: dohledá otázky uloženého testu a nabídne pokračování,
+  // případně test, kterému mezitím vypršel čas, rovnou vyhodnotí
+  function obnovTest() {
+    testBeh = testUlozeny;
+    testUlozeny = null;
+    if (!testBeh) return;
+    var podleKlice = {};
+    vsechny.forEach(function (o) { podleKlice[klic(o)] = o; });
+    var ok = testBeh.polozky.every(function (p) {
+      p.o = podleKlice[p.k];
+      return p.o && Array.isArray(p.m) && p.m.length;
+    });
+    if (!ok) {
+      var bezel = !testBeh.konec;
+      testBeh = null; ulozTesty();
+      if (bezel) toast("⚠️", "Rozpracovaný test se nedal obnovit", "Otázky se mezitím změnily.");
+      return;
+    }
+    if (testBeh.konec) return;
+    var bezi = Date.now() < testBeh.start + testBeh.limit;
+    if (!bezi) vyhodnotTest(true);              // mezitím vypršel čas, rovnou výsledek
+    oznacPrepinac(document.getElementById("prepinacRezim"), "data-rezim", "test");
+    nastavRezim("test");
+    if (bezi) vykresliUvodTestu();              // nabídne pokračování se zbývajícím časem
+  }
+
+  // ---------------------------------------------------------- test: průběh
+
+  function testBezi() { return !!(testBeh && !testBeh.konec); }
+
+  function testZbyva() {
+    return testBeh ? Math.max(0, testBeh.start + testBeh.limit - Date.now()) : 0;
+  }
+
+  function spustTest() {
+    var polozky = sestavTest(vsechny, nedavneOtazky());
+    if (!polozky) {
+      toast("⚠️", "Test nejde sestavit", "Obecná část potřebuje aspoň 20 otázek a oborová 10.");
+      return;
+    }
+    testBeh = { start: Date.now(), limit: limitTestu(), konec: null, pozice: 0,
+                neprecteno: false, polozky: polozky, vysledek: null };
+    ulozTesty();
+    vykresliTestRezim();
+  }
+
+  function vykresliTestRezim() {
+    el.app.classList.remove("zodpovezeno");
+    if (testBezi()) { vykresliTestOtazku(true); return; }
+    if (testBeh && testBeh.konec && testBeh.neprecteno) {
+      vykresliVysledekTestu();
+      return;
+    }
+    vykresliUvodTestu();
+  }
+
+  function vykresliTabulku() {
+    var t = el.testTabulka;
+    t.textContent = "";
+    ["obecna", "oborova"].forEach(function (c) {
+      var skup = document.createElement("div");
+      skup.className = "test-skupina " + c;
+      var hl = document.createElement("div");
+      hl.className = "test-cast";
+      var hotovo = 0, pocet = 0;
+      testBeh.polozky.forEach(function (p) { if (p.cast === c) { pocet++; if (p.v !== null) hotovo++; } });
+      hl.textContent = TEST_CASTI[c].jmeno + " · " + hotovo + " z " + pocet;
+      skup.appendChild(hl);
+      var mriz = document.createElement("div");
+      mriz.className = "test-mriz";
+      testBeh.polozky.forEach(function (p, i) {
+        if (p.cast !== c) return;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "test-policko";
+        if (p.v !== null) b.classList.add("zodpovezeno");
+        if (i === testBeh.pozice) b.classList.add("aktualni");
+        b.textContent = i + 1;
+        b.setAttribute("aria-label", "Otázka " + (i + 1) + (p.v !== null ? ", zodpovězeno" : ""));
+        b.addEventListener("click", function () { testBeh.pozice = i; ulozTesty(); vykresliTestOtazku(true); });
+        mriz.appendChild(b);
+      });
+      skup.appendChild(mriz);
+      t.appendChild(skup);
+    });
+  }
+
+  function vykresliTestCas() {
+    if (rezim !== "test") return;
+    if (testBezi()) {
+      var z = testZbyva();
+      el.skore.className = "skore test-cas" + (z < 5 * 60000 ? " dochazi" : "");
+      el.skore.innerHTML = "⏱ <b>" + mmss(z) + "</b>";
+    } else {
+      el.skore.className = "skore";
+    }
+    var pokr = document.getElementById("btnTestPokracovat");
+    if (pokr) pokr.textContent = "Pokračovat v testu · zbývá " + mmss(testZbyva());
+  }
+
+  function vykresliTestOtazku(posunout) {
+    var b = testBeh, p = b.polozky[b.pozice];
+    aktualni = p.o;
+    el.app.classList.remove("kap-prehled");
+    el.app.classList.add("test-bezi");
+    el.kapObsah.textContent = "";
+    el.rysky.textContent = "";
+    el.hlaskaKolo.classList.add("skryte");
+
+    el.idcko.textContent = "";
+    var st = document.createElement("span");
+    st.className = "test-stitek " + p.cast;
+    st.textContent = TEST_CASTI[p.cast].jmeno;
+    el.idcko.appendChild(st);
+    // ID se během testu neukazuje, prozradilo by okruh; je až ve výsledcích
+    el.idcko.appendChild(document.createTextNode("otázka " + (b.pozice + 1) + " z " + b.polozky.length));
+
+    el.otazka.textContent = p.o.otazka;
+    el.odpovedi.textContent = "";
+    p.m.forEach(function (m, i) {
+      var t = document.createElement("button");
+      t.className = "odpoved";
+      t.type = "button";
+      if (i === p.v) t.classList.add("zvolena");
+      var pi = document.createElement("span");
+      pi.className = "pismeno";
+      pi.textContent = "abc".charAt(i);
+      var x = document.createElement("span");
+      x.className = "text";
+      x.textContent = m.text;
+      t.appendChild(pi); t.appendChild(x);
+      t.addEventListener("click", function () { testOdpovez(i); });
+      el.odpovedi.appendChild(t);
+    });
+    el.sporne.classList.add("skryte");
+    el.odkazPredpis.classList.add("skryte");
+
+    document.getElementById("btnTestZpet").disabled = b.pozice <= 0;
+    document.getElementById("btnTestDalsi").disabled = b.pozice >= b.polozky.length - 1;
+
+    vykresliTabulku();
+    vykresliTestCas();
+    if (posunout) window.scrollTo(0, 0);
+  }
+
+  function testOdpovez(i) {
+    if (!testBezi() || rezim !== "test") return;
+    var p = testBeh.polozky[testBeh.pozice];
+    if (i < 0 || i >= p.m.length) return;
+    p.v = i;
+    ulozTesty();
+    Array.prototype.forEach.call(el.odpovedi.children, function (t, j) {
+      t.classList.toggle("zvolena", j === i);
+    });
+    vykresliTabulku();
+  }
+
+  function testPosun(o) {
+    if (!testBezi()) return;
+    var n = testBeh.pozice + o;
+    if (n < 0 || n >= testBeh.polozky.length) return;
+    testBeh.pozice = n;
+    ulozTesty();
+    vykresliTestOtazku(true);
+  }
+
+  function odevzdejTest() {
+    if (!testBezi()) return;
+    var chybi = testBeh.polozky.filter(function (p) { return p.v === null; }).length;
+    if (!window.confirm(chybi
+        ? "Nezodpovězeno " + chybi + " " + sklon(chybi, "otázka", "otázky", "otázek") + " z "
+          + testBeh.polozky.length + ". Ty se počítají za 0 bodů. Opravdu odevzdat?"
+        : "Odevzdat test? Odpovědi pak už nepůjde změnit.")) return;
+    vyhodnotTest(false);
+    vykresliVysledekTestu();
+  }
+
+  // každou sekundu a po návratu z pozadí: odpočet a odevzdání po vypršení
+  function testTik() {
+    if (!testBezi()) return;
+    if (testZbyva() > 0) { vykresliTestCas(); return; }
+    vyhodnotTest(true);
+    if (rezim === "test") {
+      vykresliVysledekTestu();
+      toast("⏱", "Čas vypršel", "Test se odevzdal automaticky.");
+    } else {
+      toast("⏱", "Čas testu vypršel", "Test se odevzdal sám, výsledek najdeš v režimu Test.");
+    }
+    zvuk("gong");
+    vibruj([300, 150, 300]);
+  }
+
+  function vyhodnotTest(vyprsel) {
+    var b = testBeh;
+    if (!b || b.konec) return;
+    var ted = Date.now();
+    b.konec = Math.min(ted, b.start + b.limit);
+    var body = { obecna: 0, oborova: 0 };
+    b.polozky.forEach(function (p) {
+      if (p.v !== null && p.m[p.v].spravna) body[p.cast]++;
+    });
+    var vo = verdiktCasti("obecna", body.obecna), vb = verdiktCasti("oborova", body.oborova);
+    b.vysledek = { obecna: body.obecna, oborova: body.oborova, vObecna: vo, vOborova: vb,
+                   verdikt: verdiktCelkem(vo, vb), cas: b.konec - b.start, vyprsel: !!vyprsel };
+    b.neprecteno = true;
+
+    // odpovědi do statistik jako ve zkoušení, aby je plánovač vzal v potaz
+    b.polozky.forEach(function (p) {
+      if (p.v === null) return;
+      var s = statZaznam(p.o);
+      if (p.m[p.v].spravna) {
+        s.ano++;
+        s.uroven = Math.min(INTERVALY.length - 1, s.uroven + 1);
+      } else {
+        s.ne++;
+        s.uroven = 0;
+      }
+      s.kdy = ted;
+    });
+    ulozUlozene();
+
+    historieTestu.push({ kdy: b.start, konec: b.konec, obecna: body.obecna, oborova: body.oborova,
+                         verdikt: b.vysledek.verdikt, cas: b.vysledek.cas, limit: b.limit,
+                         klice: b.polozky.map(function (p) { return p.k; }),
+                         chyby: chybyTestu(b).map(function (p) { return p.k; }) });
+    ulozTesty();
+
+    var zodp = b.polozky.filter(function (p) { return p.v !== null; }).length;
+    hraPoTestu(body.obecna + body.oborova, zodp - body.obecna - body.oborova,
+               b.vysledek.verdikt === "vyhovel");
+  }
+
+  function chybyTestu(b) {
+    return b.polozky.filter(function (p) { return p.v === null || !p.m[p.v].spravna; });
+  }
+
+  // ---------------------------------------------------------- test: obrazovky
+
+  function datumCas(ts) {
+    var d = new Date(ts);
+    return d.getDate() + ". " + (d.getMonth() + 1) + ". " + d.getFullYear() + " "
+      + d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  function testPrehled() {
+    aktualni = null;
+    el.app.classList.add("kap-prehled");
+    el.app.classList.remove("test-bezi");
+    el.rysky.textContent = "";
+    el.kapObsah.textContent = "";
+    el.skore.className = "skore";
+    window.scrollTo(0, 0);
+  }
+
+  function vykresliUvodTestu() {
+    testPrehled();
+    el.skore.innerHTML = historieTestu.length
+      ? "testů <b>" + historieTestu.length + "</b>" : "";
+
+    var h = document.createElement("div");
+    h.className = "kap-vysledek";
+    var nad = document.createElement("h2");
+    nad.textContent = "Test nanečisto";
+    var pod = document.createElement("small");
+    pod.textContent = "Simulace písemné části autorizační zkoušky";
+    nad.appendChild(pod);
+    h.appendChild(nad);
+    el.kapObsah.appendChild(h);
+
+    var p = document.createElement("p");
+    p.className = "kap-uvod";
+    var o = TEST_CASTI.obecna, b = TEST_CASTI.oborova;
+    p.textContent = o.pocet + b.pocet + " otázek: " + o.pocet + " z obecné části (okruhy "
+      + okruhyCasti("obecna") + ") a " + b.pocet + " z oborové (" + okruhyCasti("oborova")
+      + "). Z každého okruhu padne aspoň jedna otázka, zbytek podle velikosti okruhů. Na test máš " + Math.round(limitTestu() / 60000)
+      + " minut. Až do odevzdání neuvidíš, co je správně. Mezi otázkami se můžeš volně "
+      + "pohybovat a odpověď měnit. Každá část se hodnotí zvlášť podle Pokynů AR ČKAIT: "
+      + "obecná část " + o.vyhovel + " a více bodů vyhověl, " + o.doplnujici + " až " + (o.vyhovel - 1)
+      + " doplňující otázky, méně nevyhověl; oborová část " + b.vyhovel + " a více vyhověl, "
+      + b.doplnujici + " až " + (b.vyhovel - 1) + " doplňující otázky, méně nevyhověl.";
+    el.kapObsah.appendChild(p);
+
+    if (testBezi()) {
+      var pokr = document.createElement("button");
+      pokr.type = "button";
+      pokr.id = "btnTestPokracovat";
+      pokr.className = "kap-pokracovat";
+      pokr.addEventListener("click", function () { vykresliTestOtazku(true); });
+      el.kapObsah.appendChild(pokr);
+      var tl = document.createElement("div");
+      tl.className = "odkaz";
+      tl.appendChild(tlacitkoKap("Odevzdat a vyhodnotit", false, odevzdejTest));
+      el.kapObsah.appendChild(tl);
+      vykresliTestCas();
+    } else {
+      var start = document.createElement("button");
+      start.type = "button";
+      start.className = "kap-pokracovat";
+      start.textContent = "Začít test";
+      start.addEventListener("click", spustTest);
+      el.kapObsah.appendChild(start);
+      if (testBeh && testBeh.konec && testBeh.vysledek) {
+        var od = document.createElement("div");
+        od.className = "odkaz";
+        od.appendChild(tlacitkoKap("Výsledek posledního testu", false, vykresliVysledekTestu));
+        el.kapObsah.appendChild(od);
+      }
+    }
+
+    if (historieTestu.length) {
+      var sez = document.createElement("div");
+      sez.className = "seznam test-seznam";
+      vykresliHistoriiTestu(sez, 5);
+      el.kapObsah.appendChild(sez);
+    }
+  }
+
+  function vykresliHistoriiTestu(cil, kolik) {
+    if (!historieTestu.length) return;
+    var hl = document.createElement("div");
+    hl.className = "radek";
+    hl.innerHTML = "<span class=\"kdo\"><b>Testy nanečisto</b></span>"
+      + "<span class=\"cislo\">celkem " + historieTestu.length + "</span>";
+    cil.appendChild(hl);
+    historieTestu.slice(-kolik).reverse().forEach(function (t) {
+      var r = radek(datumCas(t.kdy),
+        "obecná " + t.obecna + "/" + TEST_CASTI.obecna.pocet + " · oborová " + t.oborova + "/"
+          + TEST_CASTI.oborova.pocet + " · čas " + mmss(t.cas),
+        "", false);
+      var c = r.querySelector(".cislo");
+      c.textContent = VERDIKTY[t.verdikt] || t.verdikt;
+      c.className = "cislo verdikt " + t.verdikt;
+      if (t.chyby && t.chyby.length && !testBezi()) {
+        var pr = document.createElement("button");
+        pr.type = "button";
+        pr.className = "test-procvicit";
+        pr.textContent = "Procvičit " + t.chyby.length + " "
+          + sklon(t.chyby.length, "chybu", "chyby", "chyb");
+        pr.addEventListener("click", function () { procvicChyby(t.chyby, "z testu " + datumCas(t.kdy)); });
+        r.querySelector(".kdo").appendChild(pr);
+      }
+      cil.appendChild(r);
+    });
+    var vse = chybyVsechTestu();
+    if (vse.length && historieTestu.length > 1 && !testBezi()) {
+      var rv = document.createElement("div");
+      rv.className = "radek";
+      var bv = document.createElement("button");
+      bv.type = "button";
+      bv.className = "test-procvicit";
+      bv.textContent = "Procvičit chyby ze všech testů (" + vse.length + ")";
+      bv.addEventListener("click", function () { procvicChyby(vse, "ze všech testů"); });
+      rv.appendChild(bv);
+      cil.appendChild(rv);
+    }
+  }
+
+  function vykresliVysledekTestu() {
+    var b = testBeh;
+    if (!b || !b.vysledek) { vykresliUvodTestu(); return; }
+    var cerstvy = b.neprecteno;
+    b.neprecteno = false;
+    ulozTesty();
+    testPrehled();
+    var v = b.vysledek;
+    el.skore.innerHTML = "<b>" + (v.obecna + v.oborova) + "</b> / " + b.polozky.length;
+
+    var hl = document.createElement("div");
+    hl.className = "kap-vysledek";
+    var nad = document.createElement("h2");
+    nad.textContent = "Výsledek testu";
+    var pod = document.createElement("small");
+    pod.textContent = datumCas(b.start);
+    nad.appendChild(pod);
+    var verd = document.createElement("div");
+    verd.className = "test-verdikt " + v.verdikt;
+    verd.textContent = VERDIKTY[v.verdikt];
+    var cas = document.createElement("p");
+    cas.textContent = v.vyprsel
+      ? "Čas vypršel, test se odevzdal sám po " + mmss(v.cas) + "."
+      : "Spotřebovaný čas " + mmss(v.cas) + " z " + mmss(b.limit) + ".";
+    hl.appendChild(nad); hl.appendChild(verd); hl.appendChild(cas);
+    el.kapObsah.appendChild(hl);
+
+    var casti = document.createElement("div");
+    casti.className = "seznam test-seznam";
+    [["obecna", v.obecna, v.vObecna], ["oborova", v.oborova, v.vOborova]].forEach(function (x) {
+      var c = TEST_CASTI[x[0]];
+      var r = radek(c.jmeno + "  " + x[1] + " / " + c.pocet,
+        "vyhověl od " + c.vyhovel + ", doplňující otázky " + c.doplnujici + " až " + (c.vyhovel - 1), "", false);
+      var ci = r.querySelector(".cislo");
+      ci.textContent = VERDIKTY[x[2]];
+      ci.className = "cislo verdikt " + x[2];
+      casti.appendChild(r);
+    });
+    el.kapObsah.appendChild(casti);
+
+    var chyby = chybyTestu(b);
+
+    // tlačítka nad seznamem chyb, aby se k nim nemuselo dlouho rolovat
+    var tl = document.createElement("div");
+    tl.className = "tlacitka test-akce";
+    tl.appendChild(tlacitkoKap("Nový test", !chyby.length, spustTest));
+    if (chyby.length) {
+      tl.appendChild(tlacitkoKap("Procvičit chyby", true, function () {
+        procvicChyby(chyby.map(function (p) { return p.k; }), "z tohoto testu");
+      }));
+    }
+    el.kapObsah.appendChild(tl);
+
+    if (chyby.length) {
+      var sez = document.createElement("div");
+      sez.className = "seznam kap-chyby test-chyby";
+      var t = document.createElement("div");
+      t.className = "radek";
+      t.innerHTML = "<span class=\"kdo\"><b>Chybné a nezodpovězené</b></span>"
+        + "<span class=\"cislo\">" + chyby.length + "</span>";
+      sez.appendChild(t);
+      chyby.forEach(function (p) {
+        var r = document.createElement("div");
+        r.className = "radek";
+        var kdo = document.createElement("span");
+        kdo.className = "kdo";
+        var id = document.createElement("b");
+        id.textContent = (b.polozky.indexOf(p) + 1) + ". " + (p.o.id ? p.o.id + "  " : "");
+        kdo.appendChild(id);
+        kdo.appendChild(document.createTextNode(p.o.otazka));
+        var tv = document.createElement("small");
+        tv.className = "test-tvoje";
+        tv.textContent = p.v === null ? "Nezodpovězeno"
+          : "✗ " + p.m[p.v].text + (p.m[p.v].sporny ? " (tuhle možnost je třeba ověřit v předpisu)" : "");
+        var spr = document.createElement("small");
+        spr.className = "kap-spravna";
+        spr.textContent = "✓ " + p.o.spravna;
+        kdo.appendChild(tv); kdo.appendChild(spr);
+        if (p.o.odkaz) {
+          var od = document.createElement("small");
+          od.className = "test-odkaz";
+          od.textContent = p.o.odkaz;
+          kdo.appendChild(od);
+        }
+        r.appendChild(kdo);
+        sez.appendChild(r);
+      });
+      el.kapObsah.appendChild(sez);
+    }
+
+    if (cerstvy && v.verdikt === "vyhovel") { zvuk("fanfara"); konfetyVelke(); }
+  }
+
+  // přepne do zkoušení jen nad chybnými a nezodpovězenými otázkami testu
+  function procvicChyby(klice, odkud) {
+    if (testBezi()) { toast("⏱", "Test běží", "Nejdřív ho odevzdej."); return; }
+    var nove = {};
+    klice.forEach(function (k) { nove[k] = true; });
+    var pocet = vsechny.filter(function (o) { return nove[klic(o)]; }).length;
+    if (!pocet) { toast("🎯", "Není co procvičovat", "Ty otázky už v sadě nejsou."); return; }
+    omezeni = nove;
+    sezeni = {}; relaps = {}; kolo = 1;
+    prepocitejAktivni();
+    zobraz(null);
+    oznacPrepinac(document.getElementById("prepinacRezim"), "data-rezim", "zkouseni");
+    nastavRezim("zkouseni");
+    toast("🎯", "Procvičuješ chyby " + odkud, pocet + " "
+      + sklon(pocet, "otázka", "otázky", "otázek")
+      + ". K okruhům se vrátíš v nabídce ≡.");
+  }
+
+  function chybyVsechTestu() {
+    var vysl = {};
+    historieTestu.forEach(function (t) { (t.chyby || []).forEach(function (k) { vysl[k] = true; }); });
+    return Object.keys(vysl);
+  }
+
+  function nastavTest() {
+    document.getElementById("btnTestZpet").addEventListener("click", function () { testPosun(-1); });
+    document.getElementById("btnTestDalsi").addEventListener("click", function () { testPosun(1); });
+    document.getElementById("btnOdevzdat").addEventListener("click", odevzdejTest);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) testTik();
+    });
+    setInterval(testTik, 1000);
+  }
+
   // ---------------------------------------------------------- vykreslení
 
   function vykresliRysky() {
@@ -1078,7 +1750,29 @@
             + cizich + " otázek."
           : "Zatím žádná zodpovězená otázka.");
 
+    vykresliHistoriiTestu(el.statSeznam, 10);
+
     if (!vsehoOdpovedi) return;
+
+    // obecná a oborová část zvlášť, stejně jako je hodnotí zkouška
+    var poCastech = { obecna: { ano: 0, ne: 0, dotcenych: 0, celkem: 0 },
+                      oborova: { ano: 0, ne: 0, dotcenych: 0, celkem: 0 } };
+    vsechny.forEach(function (o) {
+      var b = poCastech[castOkruhu(o.sekce)], st = statistika[klic(o)];
+      b.celkem++;
+      if (st && (st.ano || st.ne)) { b.dotcenych++; b.ano += st.ano; b.ne += st.ne; }
+    });
+    ["obecna", "oborova"].forEach(function (c) {
+      var b = poCastech[c];
+      if (!b.ano && !b.ne) return;
+      var pct = Math.round(100 * b.ano / (b.ano + b.ne));
+      el.statSeznam.appendChild(radek(
+        TEST_CASTI[c].jmeno,
+        "okruhy " + okruhyCasti(c) + " · projito " + b.dotcenych + " z " + b.celkem,
+        "<b>" + pct + " %</b>",
+        pct < 70
+      ));
+    });
 
     // po okruzích
     var poOkruzich = {};
@@ -1135,7 +1829,7 @@
 
   function obsahZalohy() {
     return JSON.stringify({ verze: 2, ulozeno: Date.now(), statistika: statistika, hra: hra,
-                            kapitoly: kapHvezdy }, null, 1);
+                            kapitoly: kapHvezdy, testy: historieTestu }, null, 1);
   }
 
   function exportujStatistiku() {
@@ -1211,10 +1905,12 @@
         zkontrolujOdznaky(kontext(), true);
         ulozHru();
         if (d.kapitoly && typeof d.kapitoly === "object") { slucKapitoly(d.kapitoly); ulozKapitoly(); }
+        var testu = Array.isArray(d.testy) ? slucTesty(d.testy) : 0;   // starší zálohy testy nemají
         vykresliListu();
         vykresliStatistiky();
         el.statHlaska.textContent = "Přičteno " + pridano + " záznamů"
-          + (d.hra ? ", sloučeny body a odznaky." : ".");
+          + (d.hra ? ", sloučeny body a odznaky" : "")
+          + (testu ? ", " + testu + " " + sklon(testu, "nový test", "nové testy", "nových testů") : "") + ".";
       } catch (e) {
         el.statHlaska.textContent = "Soubor se nepodařilo přečíst.";
       }
@@ -1245,6 +1941,8 @@
       vykresliUceni();
     } else if (rezim === "kapitoly") {
       if (!kapBeh) vykresliKapitoly();
+    } else if (rezim === "test") {
+      // test na výběr okruhů nehledí, není co překreslovat
     } else if (!aktualni || aktivni.indexOf(aktualni) < 0) {
       dalsiOtazka();
     }
@@ -1254,6 +1952,7 @@
     vsechny = vysledek.otazky;
     nazvy = vysledek.nazvy;
     vybrane = {};
+    omezeni = null;
     okruhy().forEach(function (k) { vybrane[k.sekce] = true; });
     prepocitejAktivni();
     vykresliOkruhy();
@@ -1274,12 +1973,14 @@
     vykresliRysky();
     if (rezim === "uceni") { sestavUcSeznam(null); vykresliUceni(); }
     else if (rezim === "kapitoly") { kapBeh = null; vykresliKapitoly(); }
+    else if (rezim === "test") vykresliTestRezim();
     else dalsiOtazka();
   }
 
   // ---------------------------------------------------------- gamifikace
   //
-  // Hra jen poslouchá výsledky živých odpovědí ve zkoušecím módu. Plánovač,
+  // Hra jen poslouchá výsledky živých odpovědí ve zkoušecím módu a v kapitolách
+  // a souhrnně odevzdaný test (hraPoTestu). Plánovač,
   // historie ani statistiky na ní nijak nezávisí. Data hry leží pod vlastním
   // klíčem, schéma statistik (verze 2) zůstává beze změny.
 
@@ -1801,6 +2502,40 @@
     vykresliListu();
   }
 
+  // XP za odevzdaný test: stejný základ jako za živou odpověď (10 za správnou,
+  // 2 za chybnou), bez bonusů za úroveň a sérii, a 50 navíc za celkové vyhověl
+  function xpZaTest(spravne, spatne, vyhovel) {
+    return 10 * spravne + 2 * spatne + (vyhovel ? 50 : 0);
+  }
+
+  // Test se do hry započte jednou, při odevzdání. Zodpovězené otázky se přičtou
+  // k dnešku (denní cíl), série správně v řadě se nemění.
+  function hraPoTestu(spravne, spatne, vyhovel) {
+    var zodp = spravne + spatne;
+    var xp = xpZaTest(spravne, spatne, vyhovel);
+    var klicDne = denKlic(new Date());
+    var den = hra.dny[klicDne] || (hra.dny[klicDne] = { n: 0, ok: 0 });
+    var cilPred = den.n >= hra.nastaveni.cil;
+    var urovenPred = urovenZXp(hra.xp);
+    den.n += zodp;
+    den.ok += spravne;
+    hra.xp += xp;
+    var urovenPo = urovenZXp(hra.xp);
+    var nove = zodp ? zkontrolujOdznaky(kontext({ hodina: new Date().getHours() }), false) : [];
+    ulozHru();
+
+    toast("📝", "Test: +" + cislo(xp) + " XP", zodp + " "
+      + sklon(zodp, "odpověď", "odpovědi", "odpovědí") + " do denního cíle.");
+    if (!cilPred && den.n >= hra.nastaveni.cil) {
+      var sd = serieDnu();
+      toast("🎯", "Denní cíl splněn!",
+        sd > 1 ? "Už " + sd + " " + sklon(sd, "den", "dny", "dní") + " v kuse." : "Zítra zase.");
+    }
+    if (urovenPo.klic !== urovenPred.klic) toast(urovenPo.ikona, "Nová úroveň: " + urovenPo.jmeno, "");
+    nove.forEach(function (b) { toast(b.ikona, "Odznak: " + b.jmeno, b.popis); });
+    vykresliListu();
+  }
+
   // ---------------------------------------------------------- hra: vykreslení
 
   function vykresliListu() {
@@ -1931,6 +2666,8 @@
       t.title = (nazvy[k.sekce] || "Okruh " + k.sekce) + " · průměrná úroveň "
         + (k.soucet / k.celkem).toFixed(1) + " · viděno " + k.videno + " z " + k.celkem;
       t.addEventListener("click", function () {
+        if (testBezi()) { toast("⏱", "Test běží", "Procvičovat půjde, až test odevzdáš."); return; }
+        omezeni = null;
         okruhy().forEach(function (x) { vybrane[x.sekce] = x.sekce === k.sekce; });
         prepocitejAktivni();
         zavri();
@@ -2157,6 +2894,11 @@
   }
 
   function pomOznam(skoncila) {
+    if (testBezi()) {                           // během testu jen tichá zpráva, nic nepřekrýt
+      toast(pom.faze !== "prace" ? "☕" : "🍅", pom.faze !== "prace" ? "Blok hotový" : "Pauza skončila",
+        "Pomodoro počká, dokud nedopíšeš test.");
+      return;
+    }
     var jinyPanel = panelOtevreny() && el.panelPomodoro.classList.contains("skryte");
     if (pom.faze !== "prace") {
       zvuk("gong");
@@ -2279,10 +3021,12 @@
   });
   document.getElementById("btnHotovo").addEventListener("click", zavri);
   document.getElementById("btnVse").addEventListener("click", function () {
+    omezeni = null;
     okruhy().forEach(function (k) { vybrane[k.sekce] = true; });
     prepocitejAktivni(); vykresliOkruhy();
   });
   document.getElementById("btnZadny").addEventListener("click", function () {
+    omezeni = null;
     okruhy().forEach(function (k) { vybrane[k.sekce] = false; });
     prepocitejAktivni(); vykresliOkruhy();
   });
@@ -2308,8 +3052,14 @@
   document.getElementById("prepinacRezim").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b) return;
-    oznacPrepinac(this, "data-rezim", b.getAttribute("data-rezim"));
-    nastavRezim(b.getAttribute("data-rezim"));
+    var novy = b.getAttribute("data-rezim");
+    if (testBezi() && novy !== "test") {      // simulace zkoušky: z testu se neodchází
+      toast("⏱", "Test běží", "Jiný režim půjde otevřít, až test odevzdáš.");
+      return;
+    }
+    if (novy !== "zkouseni" && omezeni) { omezeni = null; prepocitejAktivni(); }
+    oznacPrepinac(this, "data-rezim", novy);
+    nastavRezim(novy);
   });
 
   document.getElementById("prepinacPoradi").addEventListener("click", function (e) {
@@ -2341,13 +3091,14 @@
     e.target.value = "";
   });
   document.getElementById("btnStatReset").addEventListener("click", function () {
-    if (!window.confirm("Opravdu vynulovat všechny statistiky včetně bodů, úrovně, odznaků a hvězdiček z kapitol? Nejde to vzít zpět.")) return;
+    if (!window.confirm("Opravdu vynulovat všechny statistiky včetně bodů, úrovně, odznaků, hvězdiček z kapitol a historie testů? Nejde to vzít zpět.")) return;
     var nastaveniHry = hra.nastaveni;
     hra = novaHra(); hra.nastaveni = nastaveniHry; serie = 0; ulozHru(); vykresliListu();
     statistika = {}; prubeh = []; spravne = celkem = 0;
     historie = []; pozice = -1; aktualni = null;
     sezeni = {}; relaps = {}; kolo = 1; sestavFrontu();
     kapHvezdy = {}; kapBeh = null; ulozKapitoly();
+    historieTestu = []; ulozTesty();
     if (rezim === "kapitoly") vykresliKapitoly();
     ulozUlozene(); vykresliRysky(); vykresliStatistiky();
   });
@@ -2358,6 +3109,16 @@
       return;
     }
     var k = e.key.toLowerCase();
+
+    if (rezim === "test") {
+      if (!testBezi()) return;
+      var it = "abc".indexOf(k);
+      if (it < 0) it = "123".indexOf(k);
+      if (it >= 0 && k.length === 1) { e.preventDefault(); testOdpovez(it); }
+      else if (k === "arrowright") { e.preventDefault(); testPosun(1); }
+      else if (k === "arrowleft") { e.preventDefault(); testPosun(-1); }
+      return;
+    }
 
     if (rezim === "kapitoly") {
       if (!kapBeh) return;
@@ -2401,14 +3162,17 @@
     vykresliListu();
     vykresliRysky();
     dalsiOtazka();
+    obnovTest();
   }
 
   statistika = nactiUlozene();
   kapHvezdy = nactiKapitoly();
+  nactiTesty();
   oznacPrepinac(document.getElementById("prepinacRezim"), "data-rezim", "zkouseni");
   oznacPrepinac(document.getElementById("prepinacPoradi"), "data-poradi", "id");
   nastavOvladaniHry();
   nastavPomodoro();
+  nastavTest();
   prazdno("Načítám otázky\u2026");
 
   // Otázky leží v otazky_data.txt vedle aplikace. Service worker je drží
@@ -2422,6 +3186,16 @@
     .catch(function () {
       prazdno("Otázky se nepodařilo načíst. Zkontroluj připojení a spusť aplikaci znovu.");
     });
+
+  // pro automatické testy v Node (testy/test-zkouska.js); v prohlížeči se nic neděje
+  if (window.__ZKOUSEC_TESTY__) {
+    window.__ZKOUSEC_TESTY__ = {
+      rozeber: rozeber, castOkruhu: castOkruhu, pismenoOkruhu: pismenoOkruhu,
+      verdiktCasti: verdiktCasti, verdiktCelkem: verdiktCelkem, sestavTest: sestavTest,
+      xpZaTest: xpZaTest,
+      TEST_CASTI: TEST_CASTI
+    };
+  }
 
   // ---------------------------------------------------------- PWA
 

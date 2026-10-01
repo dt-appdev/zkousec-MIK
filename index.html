@@ -48,6 +48,7 @@
 
   <div class="kolo skryte" id="hlaskaKolo"></div>
   <div class="kap-obsah" id="kapObsah"></div>
+  <div class="test-tabulka" id="testTabulka"></div>
 
   <div>
     <div class="idcko" id="idcko"></div>
@@ -74,6 +75,12 @@
     <button class="dalsi skryte" id="btnKapDalsi">Další otázka</button>
     <div class="napoveda" id="napovedaKap">Vyber jednu z možností</div>
   </div>
+
+  <div class="paticka skryte" id="patickaTest">
+    <button class="zpet" id="btnTestZpet" aria-label="Předchozí otázka">&#8592;</button>
+    <button class="dalsi" id="btnTestDalsi">Další</button>
+    <button class="odevzdat" id="btnOdevzdat">Odevzdat</button>
+  </div>
 </div>
 
 <!-- panel: výběr okruhů -->
@@ -83,6 +90,7 @@
     <button type="button" data-rezim="zkouseni">Zkoušení</button>
     <button type="button" data-rezim="kapitoly">Kapitoly</button>
     <button type="button" data-rezim="uceni">Učení</button>
+    <button type="button" data-rezim="test">Test</button>
   </div>
   <div class="prepinac skryte" id="prepinacPoradi">
     <button type="button" data-poradi="id">Podle ID</button>
@@ -95,6 +103,10 @@
     Kapitola je deset příbuzných otázek po sobě v pořadí podle ID. Odpovědi se počítají
     do bodů, série a denního cíle. Chyba se zapíše i do statistik, aby se otázka brzy
     vrátila ve zkoušení; správná odpověď statistiky ani plánovač nemění.
+  </div>
+  <div class="prepinac-popis skryte" id="popisTestu">
+    Test nanečisto jako u zkoušky: 20 otázek z obecné části a 10 z oborové, 30 minut,
+    bez nápovědy. Výběr okruhů níže se na test nevztahuje.
   </div>
   <div class="odpocet" id="odpocet"></div>
   <div class="nastaveni">
