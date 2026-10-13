@@ -701,7 +701,7 @@
     }
     hraPoOdpovedi({
       trefa: trefa, urovenPred: u, urovenPo: trefa ? u : 0, neCelkem: s ? s.ne || 0 : 0,
-      znovu: false, tlacitko: el.odpovedi.children[index]
+      znovu: false, kapitola: true, tlacitko: el.odpovedi.children[index]
     });
   }
 
@@ -1987,19 +1987,21 @@
   var HRA_ULOZISTE = "zkousec-mik-hra-v1";
   var OBVOD_KRUHU = 87.96;                     // 2·π·14 pro kroužek denního cíle
 
+  // Hodnost se nedá jen „nasbírat“: kromě XP vyžaduje i podíl otázek, které
+  // plánovač vede na úrovni 3 a výš (tj. opakovaně správně ve zkoušení nebo testu).
   var UROVNE = [
-    { xp: 0,     jmeno: "Praktikant",              ikona: "🎒" },
-    { xp: 250,   jmeno: "Pomocný dělník",          ikona: "⛏️" },
-    { xp: 600,   jmeno: "Zedník",                  ikona: "🧱" },
-    { xp: 1100,  jmeno: "Tesař",                   ikona: "🪚" },
-    { xp: 1800,  jmeno: "Železář",                 ikona: "🔩" },
-    { xp: 2700,  jmeno: "Montér",                  ikona: "🔧" },
-    { xp: 3900,  jmeno: "Mistr",                   ikona: "🦺" },
-    { xp: 5500,  jmeno: "Stavbyvedoucí",           ikona: "📋" },
-    { xp: 7600,  jmeno: "Projektant",              ikona: "📐" },
-    { xp: 10400, jmeno: "Statik",                  ikona: "🧮" },
-    { xp: 14000, jmeno: "Hlavní inženýr projektu", ikona: "🌉" },
-    { xp: 19000, jmeno: "Autorizovaný inženýr",    ikona: "🏅" }
+    { xp: 0,     zvl: 0,    jmeno: "Praktikant",              ikona: "🎒" },
+    { xp: 250,   zvl: 0,    jmeno: "Pomocný dělník",          ikona: "⛏️" },
+    { xp: 600,   zvl: 0.03, jmeno: "Zedník",                  ikona: "🧱" },
+    { xp: 1100,  zvl: 0.07, jmeno: "Tesař",                   ikona: "🪚" },
+    { xp: 1800,  zvl: 0.12, jmeno: "Železář",                 ikona: "🔩" },
+    { xp: 2700,  zvl: 0.20, jmeno: "Montér",                  ikona: "🔧" },
+    { xp: 3900,  zvl: 0.30, jmeno: "Mistr",                   ikona: "🦺" },
+    { xp: 5500,  zvl: 0.40, jmeno: "Stavbyvedoucí",           ikona: "📋" },
+    { xp: 7600,  zvl: 0.50, jmeno: "Projektant",              ikona: "📐" },
+    { xp: 10400, zvl: 0.62, jmeno: "Statik",                  ikona: "🧮" },
+    { xp: 14000, zvl: 0.75, jmeno: "Hlavní inženýr projektu", ikona: "🌉" },
+    { xp: 19000, zvl: 0.90, jmeno: "Autorizovaný inženýr",    ikona: "🏅" }
   ];
   var PRESTIZ = 5000;                          // nad nejvyšší úrovní hvězda za každých 5000 XP
   var MILNIKY_SERIE = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
@@ -2159,12 +2161,19 @@
     return n;
   }
 
+  // kolik otázek musí být na úrovni 3 a výš pro danou hodnost
+  function potrebaZvl(u) { return Math.ceil(u.zvl * vsechny.length); }
+
   function urovenZXp(xp) {
+    var nad3 = 0;
+    vsechny.forEach(function (o) { if (urovenOtazky(o) >= 3) nad3++; });
     var i = 0;
-    while (i + 1 < UROVNE.length && xp >= UROVNE[i + 1].xp) i++;
-    var u = UROVNE[i], od = u.xp, dal, hvezdy = 0;
+    while (i + 1 < UROVNE.length && xp >= UROVNE[i + 1].xp
+           && nad3 >= potrebaZvl(UROVNE[i + 1])) i++;
+    var u = UROVNE[i], od = u.xp, dal, hvezdy = 0, chybi = 0;
     if (i + 1 < UROVNE.length) {
       dal = UROVNE[i + 1].xp;
+      chybi = Math.max(0, potrebaZvl(UROVNE[i + 1]) - nad3);
     } else {
       hvezdy = Math.floor((xp - u.xp) / PRESTIZ);
       od = u.xp + hvezdy * PRESTIZ;
@@ -2174,8 +2183,20 @@
       i: i, hvezdy: hvezdy, klic: i + "/" + hvezdy, ikona: u.ikona,
       jmeno: u.jmeno + (hvezdy ? " ★" + hvezdy : ""),
       od: od, dal: dal, podil: Math.max(0, Math.min(1, (xp - od) / (dal - od))),
-      dalsi: UROVNE[i + 1] || null
+      dalsi: UROVNE[i + 1] || null, chybi: chybi
     };
+  }
+
+  // jen postup nahoru stojí za oslavu; po chybě může hodnost tiše klesnout
+  function povyseni(pred, po) { return po.i > pred.i || (po.i === pred.i && po.hvezdy > pred.hvezdy); }
+
+  // text k nové hodnosti: co chybí do další
+  function coDal(u) {
+    if (!u.dalsi) return "Nejvyšší hodnost. Teď už jen razítko od komise.";
+    var t = [];
+    if (u.dal > hra.xp) t.push(cislo(u.dal - hra.xp) + " XP");
+    if (u.chybi) t.push(u.chybi + " " + sklon(u.chybi, "otázka", "otázky", "otázek") + " na úroveň 3+");
+    return "Další: " + u.dalsi.jmeno + (t.length ? " za " + t.join(" a ") : "") + ".";
   }
 
   // úroveň otázky jen pro čtení, na rozdíl od statZaznam nic nezakládá
@@ -2437,7 +2458,9 @@
     if (u.trefa) {
       den.ok++;
       serie++;
-      xp = 10 + [8, 5, 3, 1, 1, 1][Math.min(5, Math.max(0, u.urovenPred))];
+      // bonus za málo známou otázku jen ve zkoušení: v kapitole správná odpověď
+      // úroveň nezvedá, takže by se dal při každém průchodu vybírat znovu
+      xp = 10 + (u.kapitola ? 0 : [8, 5, 3, 1, 1, 1][Math.min(5, Math.max(0, u.urovenPred))]);
       if (u.znovu) { xp += 10; stitek = "Oprava!"; hra.opravy++; }
       if (u.urovenPred === 4 && u.urovenPo === 5) { xp += 15; stitek = "Zvládnuto!"; }
       xp += Math.min(10, Math.floor(serie / 5) * 2);
@@ -2482,12 +2505,9 @@
       vibruj([40, 60, 40, 60, 120]);
     }
 
-    if (urovenPo.klic !== urovenPred.klic) {
+    if (povyseni(urovenPred, urovenPo)) {
       hlavni = "fanfara";
-      toast(urovenPo.ikona, "Nová úroveň: " + urovenPo.jmeno,
-        urovenPo.dalsi
-          ? "Další: " + urovenPo.dalsi.jmeno + " za " + cislo(urovenPo.dal - hra.xp) + " XP."
-          : "Nejvyšší hodnost. Teď už jen razítko od komise.");
+      toast(urovenPo.ikona, "Nová úroveň: " + urovenPo.jmeno, coDal(urovenPo));
       konfetyVelke();
       vibruj([40, 60, 40, 60, 120]);
     }
@@ -2531,7 +2551,7 @@
       toast("🎯", "Denní cíl splněn!",
         sd > 1 ? "Už " + sd + " " + sklon(sd, "den", "dny", "dní") + " v kuse." : "Zítra zase.");
     }
-    if (urovenPo.klic !== urovenPred.klic) toast(urovenPo.ikona, "Nová úroveň: " + urovenPo.jmeno, "");
+    if (povyseni(urovenPred, urovenPo)) toast(urovenPo.ikona, "Nová úroveň: " + urovenPo.jmeno, coDal(urovenPo));
     nove.forEach(function (b) { toast(b.ikona, "Odznak: " + b.jmeno, b.popis); });
     vykresliListu();
   }
@@ -2543,8 +2563,11 @@
     var u = urovenZXp(hra.xp);
     el.urovenIkona.textContent = u.ikona;
     el.urovenJmeno.textContent = u.jmeno;
-    el.xpText.textContent = cislo(hra.xp - u.od) + " / " + cislo(u.dal - u.od) + " XP";
+    el.xpText.textContent = cislo(Math.min(hra.xp, u.dal) - u.od) + " / " + cislo(u.dal - u.od) + " XP"
+      + (u.chybi ? " · 🔒 " + u.chybi + " ot. na úr. 3+" : "");
+    el.xpText.title = u.dalsi ? coDal(u) : "";
     el.xpLista.style.width = (100 * u.podil).toFixed(1) + "%";
+    el.xpLista.classList.toggle("zamceno", u.chybi > 0 && u.podil >= 1);
 
     el.serie.textContent = "🔥 " + serie;
     el.serie.classList.toggle("hori", serie >= 5);

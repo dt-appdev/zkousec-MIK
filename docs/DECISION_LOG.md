@@ -379,6 +379,23 @@ Ověřuje to `node testy/test-zkouska.js`, který načte skutečný `js/app.js` 
 Node bez prohlížeče a bez závislostí a ověří rozdělení okruhů, hranice hodnocení
 a sestavení testu.
 
+## Hodnosti hry podmíněné zvládnutím (13. 10. 2026)
+
+Hodnosti se dosud řídily jen nasbíranými XP, takže šly vyšplhat samotným
+objemem práce. Nejvíc to bylo vidět v kapitolách: správná odpověď tam úroveň
+otázky nezvedá, takže otázka zůstávala na nule a při každém průchodu znovu
+vynášela plný bonus za neznámou otázku (18 až 28 XP). Na nejvyšší hodnost tak
+stačily zhruba dva průchody kapitolami bez skutečného zvládnutí.
+
+Nově má každá hodnost kromě hranice XP i požadovaný podíl otázek, které plánovač
+vede na úrovni 3 a výš (od 3 % pro Zedníka po 90 % pro Autorizovaného inženýra,
+což odpovídá odznaku Připraven). Úroveň otázek zvedá jen zkoušecí mód a test,
+takže kapitoly samy o sobě k vyšší hodnosti nevedou. Bonus za málo známou otázku
+se v kapitolách už nepřičítá. Hodnost se počítá ze stávajících dat, schéma
+úložiště se nemění a už získané odznaky zůstávají. Po chybě může hodnost tiše
+klesnout, oslavuje se jen postup nahoru. Když XP stačí, ale chybí zvládnuté
+otázky, lišta se vyšrafuje a vedle XP je vidět, kolik otázek ještě chybí.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných

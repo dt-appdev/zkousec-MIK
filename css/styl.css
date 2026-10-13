@@ -618,6 +618,9 @@ body { overscroll-behavior: none; }
   background: var(--xp);
   transition: width .5s cubic-bezier(.2, .8, .2, 1);
 }
+.xp-lista div.zamceno {                       /* XP stačí, chybí zvládnuté otázky */
+  background: repeating-linear-gradient(45deg, var(--tlumene) 0 4px, transparent 4px 8px);
+}
 
 .serie {
   flex: 0 0 auto;
