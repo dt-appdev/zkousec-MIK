@@ -2141,7 +2141,14 @@
 
   function sklon(n, jeden, dva, pet) { return n === 1 ? jeden : (n >= 2 && n <= 4 ? dva : pet); }
 
-  function denKlic(d) {
+  // Herní den začíná ve 2:00, ne o půlnoci: učení po půlnoci se ještě počítá
+  // do předchozího dne (denní cíl, série dní, pomodora). Posun přes setHours
+  // místo odečtení milisekund, aby to sedělo i ve dnech změny času.
+  var ZACATEK_DNE = 2;
+
+  function denKlic(cas) {
+    var d = new Date(cas.getTime());
+    d.setHours(d.getHours() - ZACATEK_DNE);
     return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2)
       + "-" + ("0" + d.getDate()).slice(-2);
   }
@@ -3213,7 +3220,7 @@
   // pro automatické testy v Node (testy/test-zkouska.js); v prohlížeči se nic neděje
   if (window.__ZKOUSEC_TESTY__) {
     window.__ZKOUSEC_TESTY__ = {
-      rozeber: rozeber, castOkruhu: castOkruhu, pismenoOkruhu: pismenoOkruhu,
+      denKlic: denKlic, rozeber: rozeber, castOkruhu: castOkruhu, pismenoOkruhu: pismenoOkruhu,
       verdiktCasti: verdiktCasti, verdiktCelkem: verdiktCelkem, sestavTest: sestavTest,
       xpZaTest: xpZaTest,
       TEST_CASTI: TEST_CASTI

@@ -396,6 +396,19 @@ se v kapitolách už nepřičítá. Hodnost se počítá ze stávajících dat, 
 klesnout, oslavuje se jen postup nahoru. Když XP stačí, ale chybí zvládnuté
 otázky, lišta se vyšrafuje a vedle XP je vidět, kolik otázek ještě chybí.
 
+## Herní den začíná ve 2:00 (13. 10. 2026)
+
+Denní cíl, série dní a počet dnešních pomodor se dosud přepínaly o půlnoci,
+takže učení před spaním po dvanácté padalo do nového dne a večerní série se
+rozdělila na dva nedokončené dny. Nově začíná herní den ve 2:00 ráno: odpověď
+ve 1:30 se připíše ke včerejšku. Posun je na jediném místě, ve funkci
+`denKlic` (konstanta `ZACATEK_DNE`), takže ho přebírají všechna místa, která
+den počítají. Klíče dnů v úložišti mají dál tvar RRRR-MM-DD, schéma se
+nemění a starší data i zálohy platí beze změny. Odpočet dní do zkoušky a
+odznak za noční učení se řídí skutečným časem, protože zkouška je kalendářní
+datum. Posun se dělá přes `setHours`, ne odečtením milisekund, aby ve dnech
+změny času nevznikla hodina zapsaná do špatného dne.
+
 ## Zásady komunikace
 
 Vysvětlivky a rozbory se píší v souvislé próze bez odrážek, šipek a podobných
