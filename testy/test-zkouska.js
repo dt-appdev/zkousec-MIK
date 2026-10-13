@@ -277,5 +277,17 @@ test("XP za test: 10 za správnou, 2 za chybnou, 50 za vyhověl", function () {
   assert.strictEqual(T.xpZaTest(26, 4, true), 318);
 });
 
+test("herní den začíná ve 2:00, ne o půlnoci", function () {
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 13, 23, 59)), "2026-10-13");
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 14, 0, 30)), "2026-10-13");
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 14, 1, 59)), "2026-10-13");
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 14, 2, 0)), "2026-10-14");
+  assert.strictEqual(T.denKlic(new Date(2026, 0, 1, 1, 0)), "2025-12-31");
+  // dny změny času (v české zóně), jinde se chovají jako běžné dny
+  assert.strictEqual(T.denKlic(new Date(2026, 2, 29, 3, 30)), "2026-03-29");
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 25, 1, 30)), "2026-10-24");
+  assert.strictEqual(T.denKlic(new Date(2026, 9, 25, 3, 0)), "2026-10-25");
+});
+
 console.log("\n" + (testu - chyb) + " z " + testu + " testů prošlo.");
 process.exit(chyb ? 1 : 0);
